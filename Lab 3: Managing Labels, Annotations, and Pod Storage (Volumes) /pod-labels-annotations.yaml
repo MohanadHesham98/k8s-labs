@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: labeled-demo-pod
+  labels:
+    environment: production
+    app: backend-api
+    tier: frontend
+    team: devops
+  annotations:
+    buildVersion: "v1.4.2"
+    contact: "admin@devops.local"
+    description: "Sample pod demonstrating labels and annotations management"
+spec:
+  containers:
+  - name: nginx-app
+    image: nginx:alpine
+    ports:
+    - containerPort: 80
