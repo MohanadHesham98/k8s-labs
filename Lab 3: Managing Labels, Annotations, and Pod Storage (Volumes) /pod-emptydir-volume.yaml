@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-shared-emptydir
+  labels:
+    app: log-generator
+spec:
+  volumes:
+  # 1. Define the shared emptyDir volume
+  - name: shared-data-volume
+    emptyDir: {}
+
+  containers:
+  # Container 1: Writer / Data Generator
+  - name: log-writer
+    image: alpine
+    command: ["/bin/sh", "-c"]
+    args:
+    - while true; do
+        echo "$(date) - Application operational check" >> /var/log/app/index.html;
+        sleep 5;
+      done
+    volumeMounts:
+    - name: shared-data-volume
+      mountPath: /var/log/app
+
+  # Container 2: Nginx Reader / Web Server
+  - name: web-server
+    image: nginx:alpine
+    ports:
+    - containerPort: 80
+    volumeMounts:
+    - name: shared-data-volume
+      mountPath: /usr/share/nginx/html
