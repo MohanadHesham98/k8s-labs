@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-hostpath-demo
+  labels:
+    storage: hostpath-test
+spec:
+  volumes:
+  # Define hostPath volume pointing to VM directory
+  - name: vm-storage
+    hostPath:
+      path: /mnt/node-data
+      type: DirectoryOrCreate
+
+  containers:
+  - name: web-server
+    image: nginx:alpine
+    ports:
+    - containerPort: 80
+    volumeMounts:
+    - name: vm-storage
+      mountPath: /usr/share/nginx/html
