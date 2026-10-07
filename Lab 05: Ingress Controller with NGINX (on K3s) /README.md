@@ -1,125 +1,139 @@
-# Lab 05: Ingress Controller with NGINX (on K3s)
+# Lab 05: Host-Based and Path-Based Ingress Routing on K3s
 
-This repository contains the complete step-by-step guide and commands for **Lab 5: Ingress Controller with NGINX on K3s**.
+This repository contains the complete step-by-step guide and commands for **Lab 5: Ingress Routing with NGINX Ingress Controller on K3s**.
 
 The purpose of this lab is to familiarize you with:
 
-- Installing and configuring NGINX Ingress Controller on K3s (disabling default Traefik).
-- Deploying multiple sample backend web applications.
-- Exposing backend applications internally via ClusterIP Services.
-- Configuring Path-Based Routing using Kubernetes Ingress resources.
-- Configuring Host-Based Routing (Domain/Subdomain-based) using Ingress.
-- Mapping local domain names via `/etc/hosts`.
-- Testing traffic routing, headers, and HTTP responses.
-- Cleaning up Kubernetes Ingress resources and deployments.
+- Setting up a lightweight K3s Kubernetes cluster without the default Traefik controller.
+- Deploying the NGINX Ingress Controller on K3s.
+- Deploying multi-tier application workloads (NGINX as app1 and Apache HTTPD as app2).
+- Configuring Host-Based Ingress Routing (`app1.lab.local`, `app2.lab.local`).
+- Configuring Path-Based Ingress Routing (`myapp.local/app1`, `myapp.local/app2`) with URL rewriting.
+- Configuring local DNS resolution using `/etc/hosts`.
+- Verifying and testing Ingress traffic routing with `curl`.
+- Cleaning up Kubernetes resources and environment configurations.
+
+
+## Host-Based vs. Path-Based Ingress Routing
+
+| Feature | Host-Based Routing | Path-Based Routing |
+|---|---|---|
+| **Routing Metric** | Distinct Domain / Host Header | URL Path Prefix on a Shared Host |
+| **URL Example** | http://app1.lab.local, http://app2.lab.local | http://myapp.local/app1, http://myapp.local/app2 |
+| **Use Case** | Multi-domain setups or separate microservice portals | Single-domain microservices routing (API gateways) |
+| **URL Rewriting** | Usually not required | Requires `rewrite-target` annotation to strip prefix |
+| **DNS Requirements** | Unique DNS mapping for every domain | Single DNS entry mapping to the Ingress controller |
 
 ---
 
-## Prerequisites
+## Step 1: Cluster Setup & NGINX Ingress Controller Installation
 
-Ensure you have K3s running on your Linux VM or node.
+### Install K3s (Disabling Traefik)
 
-K3s comes with **Traefik** as the default Ingress controller. For this lab, we will use **NGINX Ingress Controller**.
-
----
-
-## Step 1: Installing NGINX Ingress Controller on K3s
-
-### Option A: Clean K3s Installation without Traefik (Recommended)
-
-If you are setting up K3s, disable Traefik during installation:
+By default, K3s installs Traefik as its default Ingress Controller. Disable Traefik during cluster initialization to use NGINX Ingress Controller:
 
 ```bash
-curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable traefik" sh -
+curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable=traefik" sh -
 ```
 
-### Option B: Disabling Traefik on Existing K3s Cluster
+### Configure Kubeconfig Access
 
-If K3s is already installed with Traefik, remove Traefik resources:
+Set up kubeconfig access for non-root management:
 
 ```bash
-sudo k3s kubectl delete helmcharts.helm.cattle.io traefik -n kube-system
-sudo rm -f /var/lib/rancher/k3s/server/manifests/traefik.yaml
+mkdir -p ~/.kube
+sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+sudo chown $(id -u):$(id -g) ~/.kube/config
+export KUBECONFIG=~/.kube/config
+```
+
+Verify that the node is active and ready:
+
+```bash
+kubectl get nodes
 ```
 
 ### Deploy NGINX Ingress Controller
 
-Apply the official NGINX Ingress Controller manifest:
+Deploy the official NGINX Ingress Controller manifest:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/baremetal/deploy.yaml
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml
 ```
 
-Verify that the NGINX Ingress Controller Pod and Service are running:
+Verify that the Ingress controller pods are running:
 
 ```bash
 kubectl get pods -n ingress-nginx
-kubectl get svc -n ingress-nginx
 ```
-
-Ensure the controller Pod reaches `1/1 Running` status before proceeding.
+<img width="913" height="137" alt="image" src="https://github.com/user-attachments/assets/5b4fc4ba-5740-42ea-9f49-7636abef7056" />
 
 ---
 
-## Step 2: Deploying Sample Backend Applications
+## Step 2: Deploying Sample Workloads (app1 & app2)
 
-We will create two separate web applications (`app-one` and `app-two`) to demonstrate traffic routing.
+Deploy two separate web applications to represent backend services:
+- **App1:** NGINX Web Server (`app1-service`)
+- **App2:** Apache HTTPD Server (`app2-service`)
 
-Create a manifest file named `backend-apps.yaml`:
+### Create Application Deployments & Services
 
-```yaml
+Create the `apps.yaml` manifest:
+
+```bash
+cat <<EOF > apps.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: app-one-deployment
+  name: app1-deployment
   labels:
-    app: app-one
+    app: app1
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
-      app: app-one
+      app: app1
   template:
     metadata:
       labels:
-        app: app-one
+        app: app1
     spec:
       containers:
-      - name: web
-        image: nginxdemos/hello
+      - name: nginx
+        image: nginx:alpine
         ports:
         - containerPort: 80
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: app-one-svc
+  name: app1-service
 spec:
-  type: ClusterIP
   selector:
-    app: app-one
+    app: app1
   ports:
-  - port: 80
+  - protocol: TCP
+    port: 80
     targetPort: 80
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: app-two-deployment
+  name: app2-deployment
   labels:
-    app: app-two
+    app: app2
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
-      app: app-two
+      app: app2
   template:
     metadata:
       labels:
-        app: app-two
+        app: app2
     spec:
       containers:
-      - name: web
+      - name: httpd
         image: httpd:alpine
         ports:
         - containerPort: 80
@@ -127,39 +141,40 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: app-two-svc
+  name: app2-service
 spec:
-  type: ClusterIP
   selector:
-    app: app-two
+    app: app2
   ports:
-  - port: 80
+  - protocol: TCP
+    port: 80
     targetPort: 80
+EOF
 ```
 
-Apply the deployments and services:
+Apply the applications manifest:
 
 ```bash
-kubectl apply -f backend-apps.yaml
+kubectl apply -f apps.yaml
 ```
 
-Verify the status of Deployments, Pods, and Services:
+Verify that all pods and services are operational:
 
 ```bash
-kubectl get deployments
-kubectl get pods -l 'app in (app-one, app-two)'
-kubectl get svc
+kubectl get pods,svc
 ```
+<img width="825" height="334" alt="image" src="https://github.com/user-attachments/assets/aa8a9ed7-3b7d-45d0-a38c-19f36cfa025a" />
 
 ---
 
-## Step 3: Configuring Host-Based Ingress Routing
+## Step 3: Configuring Ingress Routing Rules
 
-In Host-Based routing, traffic is directed to different backend services based on the incoming HTTP `Host` header (e.g., `app1.lab.local` vs `app2.lab.local`).
+### Configure Host-Based Ingress Routing
 
-Create an Ingress manifest named `host-ingress.yaml`:
+Create `ingress-host.yaml` to route traffic based on HTTP Host headers (`app1.lab.local` and `app2.lab.local`):
 
-```yaml
+```bash
+cat <<EOF > ingress-host.yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -167,7 +182,6 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: "nginx"
 spec:
-  ingressClassName: nginx
   rules:
   - host: app1.lab.local
     http:
@@ -176,7 +190,7 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: app-one-svc
+            name: app1-service
             port:
               number: 80
   - host: app2.lab.local
@@ -186,32 +200,24 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: app-two-svc
+            name: app2-service
             port:
               number: 80
+EOF
 ```
 
-Apply the Ingress rule:
+Apply the host-based Ingress configuration:
 
 ```bash
-kubectl apply -f host-ingress.yaml
+kubectl apply -f ingress-host.yaml
 ```
 
-Inspect the Ingress resource:
+### Configure Path-Based Ingress Routing
+
+Create `ingress-path.yaml` to route traffic based on URL paths (`/app1` and `/app2`) using the `rewrite-target` annotation:
 
 ```bash
-kubectl get ingress host-based-ingress
-```
-
----
-
-## Step 4: Configuring Path-Based Ingress Routing
-
-Path-Based routing allows a single domain name to route traffic to multiple backend applications based on URL paths (e.g., `myapp.local/app1` vs `myapp.local/app2`).
-
-Create an Ingress manifest named `path-ingress.yaml`:
-
-```yaml
+cat <<EOF > ingress-path.yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -220,7 +226,6 @@ metadata:
     kubernetes.io/ingress.class: "nginx"
     nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
-  ingressClassName: nginx
   rules:
   - host: myapp.local
     http:
@@ -229,140 +234,127 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: app-one-svc
+            name: app1-service
             port:
               number: 80
       - path: /app2
         pathType: Prefix
         backend:
           service:
-            name: app-two-svc
+            name: app2-service
             port:
               number: 80
+EOF
 ```
 
-Apply the Path-Based Ingress rule:
+Apply the path-based Ingress configuration:
 
 ```bash
-kubectl apply -f path-ingress.yaml
+kubectl apply -f ingress-path.yaml
 ```
 
-Verify the active Ingress rules:
+Verify that both Ingress resources are created:
 
 ```bash
 kubectl get ingress
 ```
+<img width="1096" height="244" alt="image" src="https://github.com/user-attachments/assets/2dcb2ee4-a36e-42d0-83c3-0b062db14e4f" />
 
 ---
 
-## Step 5: Local Domain Name Resolution Setup
+## Step 4: Local DNS Resolution Setup
 
-To test domain names locally from your Host Machine or VM, map the domain names to your Node/K3s IP address in the `/etc/hosts` file.
-
-### 1. Identify Node/K3s IP Address
+Map the domain names to `127.0.0.1` in `/etc/hosts` to enable local hostname resolution:
 
 ```bash
-kubectl get nodes -o wide
-# or
-ip addr show
+echo "<vm-ip> app1.lab.local app2.lab.local myapp.local" | sudo tee -a /etc/hosts
 ```
+<img width="1213" height="160" alt="image" src="https://github.com/user-attachments/assets/3ac7b37a-263d-4be7-b83e-a571ede93e06" />
 
-### 2. Update `/etc/hosts` File
-
-On Linux/macOS (or Windows `C:\Windows\System32\drivers\etc\hosts`), edit the file with `sudo`:
+Confirm entry addition:
 
 ```bash
-sudo nano /etc/hosts
+cat /etc/hosts
 ```
-
-Add the following line (replace `192.168.56.10` with your actual K3s Node IP):
-
-```text
-192.168.56.10  app1.lab.local app2.lab.local myapp.local
-```
+<img width="841" height="266" alt="image" src="https://github.com/user-attachments/assets/72f7248f-8626-4bf6-b908-8ad7f09c99ad" />
 
 ---
 
-## Step 6: Testing Traffic Routing
+## Step 5: Verification & Traffic Routing Testing
 
 ### Test Host-Based Routing
 
-Execute `curl` requests targeting specific hostnames:
+Send a request to `app1.lab.local`:
 
 ```bash
 curl http://app1.lab.local
-curl http://app2.lab.local
 ```
+*Expected Output:* NGINX welcome page (`Welcome to nginx!`).
+<img width="826" height="642" alt="image" src="https://github.com/user-attachments/assets/dfe1715d-78d0-4b13-986c-85e28ccad202" />
 
-Alternatively, test without modifying `/etc/hosts` using `curl` header override:
+Send a request to `app2.lab.local`:
 
 ```bash
-curl -H "Host: app1.lab.local" http://<K3S_NODE_IP>
-curl -H "Host: app2.lab.local" http://<K3S_NODE_IP>
+curl http://app2.lab.local
 ```
+*Expected Output:* Apache index response (`It works!`).
+<img width="975" height="251" alt="image" src="https://github.com/user-attachments/assets/56af62c5-4588-449b-804e-70c544e17425" />
 
 ### Test Path-Based Routing
 
-Execute `curl` requests targeting different paths under `myapp.local`:
+Send a request to `myapp.local/app1`:
 
 ```bash
 curl http://myapp.local/app1
+```
+*Expected Output:* NGINX response from `app1-service`.
+<img width="931" height="642" alt="image" src="https://github.com/user-attachments/assets/dd78e2a9-b229-4906-a709-2673a7fb9f40" />
+
+Send a request to `myapp.local/app2`:
+
+```bash
 curl http://myapp.local/app2
 ```
-
-Alternatively, override the Host header:
-
-```bash
-curl -H "Host: myapp.local" http://<K3S_NODE_IP>/app1
-curl -H "Host: myapp.local" http://<K3S_NODE_IP>/app2
-```
-
-### Test via Web Browser
-
-Open your browser and visit:
-
-- `http://app1.lab.local`
-- `http://app2.lab.local`
-- `http://myapp.local/app1`
-- `http://myapp.local/app2`
+*Expected Output:* Apache response from `app2-service`.
+<img width="950" height="245" alt="image" src="https://github.com/user-attachments/assets/261d8db9-6447-4569-b7a1-5c87894dd891" />
 
 ---
 
-## Step 7: Resource Cleanup
+## Step 6: Resource Cleanup
 
-After completing the lab, clean up all created resources:
-
-Delete Ingress resources:
+### Delete Ingress and Application Resources
 
 ```bash
-kubectl delete -f path-ingress.yaml
-kubectl delete -f host-ingress.yaml
+kubectl delete -f ingress-path.yaml
+kubectl delete -f ingress-host.yaml
+kubectl delete -f apps.yaml
 ```
 
-Delete Backend Deployments and Services:
+### Remove NGINX Ingress Controller
 
 ```bash
-kubectl delete -f backend-apps.yaml
+kubectl delete -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml
 ```
 
-Confirm all resources are removed:
+### Uninstall K3s Cluster (Optional)
+
+To remove K3s and clean up host system modifications completely:
 
 ```bash
-kubectl get ingress
-kubectl get pods -l 'app in (app-one, app-two)'
+/usr/local/bin/k3s-uninstall.sh
 ```
 
 ---
 
-## Useful Ingress Commands
+## Useful Kubernetes Ingress Commands
 
 | Command | Description |
 |---|---|
-| `kubectl get ingress` | List all Ingress resources in the current namespace |
-| `kubectl describe ingress <ingress-name>` | Display detailed Ingress rules, hosts, paths, and backends |
-| `kubectl get pods -n ingress-nginx` | View NGINX Ingress Controller Pod status |
-| `kubectl logs -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx` | View NGINX Ingress Controller traffic logs |
-| `kubectl delete ingress <ingress-name>` | Delete a specific Ingress rule |
+| `kubectl get ingress` | List all Ingress rules in the current namespace |
+| `kubectl describe ingress <ingress-name>` | Display detailed routing paths, backends, and status |
+| `kubectl get pods -n ingress-nginx` | Check operational status of NGINX Ingress controller pods |
+| `kubectl logs -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx` | View real-time HTTP access and proxy logs of the controller |
+| `kubectl delete ingress <ingress-name>` | Remove a specific Ingress routing rule |
 
 ---
 
@@ -370,11 +362,11 @@ kubectl get pods -l 'app in (app-one, app-two)'
 
 In this lab, you learned how to:
 
-- Prepare a K3s cluster for NGINX Ingress Controller by disabling Traefik.
-- Deploy the NGINX Ingress Controller on bare-metal / K3s nodes.
-- Deploy backend microservices and expose them using internal `ClusterIP` Services.
-- Configure **Host-Based Routing** to route traffic based on HTTP domain headers.
-- Configure **Path-Based Routing** with URL rewrite rules using annotations.
-- Map local DNS names in `/etc/hosts` for testing.
-- Test and troubleshoot HTTP traffic routing using `curl` and web browsers.
-- Tear down Ingress and workload manifests safely.
+- Deploy K3s with custom Ingress controller configurations (disabling Traefik).
+- Install and configure the NGINX Ingress Controller.
+- Expose multiple backend applications using ClusterIP Services.
+- Implement Host-Based Ingress routing across multiple hostnames.
+- Implement Path-Based Ingress routing using URL path rewriting (`rewrite-target`).
+- Configure local hostname resolution via `/etc/hosts`.
+- Test, verify, and debug HTTP traffic routing using `curl`.
+- Perform resource teardown and environment cleanup.
