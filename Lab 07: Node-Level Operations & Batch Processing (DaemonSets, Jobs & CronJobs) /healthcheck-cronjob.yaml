@@ -1,0 +1,24 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: system-healthcheck
+spec:
+  schedule: "*/1 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: system-healthcheck
+        spec:
+          containers:
+            - name: healthcheck
+              image: busybox:1.35
+              command:
+                - /bin/sh
+                - -c
+                - "date; echo 'System healthcheck completed successfully.'"
+          restartPolicy: OnFailure
