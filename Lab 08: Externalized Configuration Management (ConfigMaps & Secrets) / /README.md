@@ -1,4 +1,4 @@
-# Lab 08: Externalized Configuration Management (ConfigMaps & Secrets)
+# Lab 08: Externalized Configuration Management (ConfigMaps & Secrets) 
 
 This repository contains the complete step-by-step guide and commands for **Lab 8: Externalized Configuration Management on Kubernetes**.
 
