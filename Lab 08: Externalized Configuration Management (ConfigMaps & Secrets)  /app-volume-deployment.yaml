@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app-volume
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web-app-volume
+  template:
+    metadata:
+      labels:
+        app: web-app-volume
+    spec:
+      containers:
+        - name: web-app
+          image: nginx:alpine
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            # Mount custom NGINX config file from ConfigMap
+            - name: config-volume
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: nginx.conf
+            # Mount Secret keys as files inside a secure directory
+            - name: secret-volume
+              mountPath: /etc/secrets
+              readOnly: true
+      volumes:
+        - name: config-volume
+          configMap:
+            name: app-config
+        - name: secret-volume
+          secret:
+            secretName: app-secret
