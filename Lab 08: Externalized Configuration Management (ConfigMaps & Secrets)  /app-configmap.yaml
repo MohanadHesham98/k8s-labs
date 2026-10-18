@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  APP_COLOR: "blue"
+  APP_MODE: "production"
+  DATABASE_HOST: "postgres-db-service"
+  nginx.conf: |
+    server {
+        listen 80;
+        location / {
+            return 200 'ConfigMap Mounted Successfully!\n';
+        }
+    }
