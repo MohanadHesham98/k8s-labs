@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app-env
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web-app-env
+  template:
+    metadata:
+      labels:
+        app: web-app-env
+    spec:
+      containers:
+        - name: web-app
+          image: busybox:1.35
+          command: ["/bin/sh", "-c", "while true; do echo App Color: $APP_COLOR, DB User: $DB_USER; sleep 10; done"]
+          env:
+            # Inject individual key from ConfigMap
+            - name: APP_COLOR
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: APP_COLOR
+            # Inject individual key from Secret
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: DB_USER
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: DB_PASSWORD
