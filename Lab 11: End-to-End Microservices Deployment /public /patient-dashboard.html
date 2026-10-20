@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Patient Dashboard | Small Steps</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="dashboard-body">
+
+  <!-- Top Nav -->
+  <nav class="dash-nav">
+    <div class="dash-nav__inner">
+      <a href="/" class="nav__logo">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z"/>
+          <circle cx="12" cy="10" r="2"/>
+        </svg>
+        Small Steps
+      </a>
+      <div class="dash-nav__links">
+        <button class="dash-nav__tab active" data-tab="book">Book a Session</button>
+        <button class="dash-nav__tab" data-tab="bookings">My Bookings</button>
+      </div>
+      <div class="dash-nav__user">
+        <span class="dash-nav__greeting" id="userGreeting">Welcome back</span>
+        <button class="btn btn--outline btn--sm" id="logoutBtn">Sign Out</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="dash-main">
+
+    <!-- Book a Session Tab -->
+    <section class="dash-tab active" id="tab-book">
+      <div class="container">
+        <div class="dash-head">
+          <div>
+            <h1 class="dash-title">Book a Session</h1>
+            <p class="dash-subtitle">Choose a therapist and find a time that works for you.</p>
+          </div>
+          <div class="dash-search">
+            <input type="text" id="doctorSearch" placeholder="Search by name or specialty...">
+          </div>
+        </div>
+
+        <!-- Doctor Cards -->
+        <div class="doctor-grid" id="doctorGrid">
+          <div class="loading-state">Loading available therapists...</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- My Bookings Tab -->
+    <section class="dash-tab" id="tab-bookings">
+      <div class="container">
+        <div class="dash-head">
+          <div>
+            <h1 class="dash-title">My Bookings</h1>
+            <p class="dash-subtitle">Track and manage your therapy appointments.</p>
+          </div>
+          <div class="booking-filter">
+            <select id="bookingFilter">
+              <option value="all">All Bookings</option>
+              <option value="Pending">Pending</option>
+              <option value="Confirmed">Confirmed</option>
+              <option value="Completed">Completed</option>
+              <option value="Cancelled">Cancelled</option>
+              <option value="Rejected">Rejected</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="bookings-list" id="bookingsList">
+          <div class="loading-state">Loading your bookings...</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Booking Modal -->
+  <div class="modal-overlay" id="bookingModal">
+    <div class="modal">
+      <button class="modal__close" id="closeBookingModal">&times;</button>
+      <div class="modal__header">
+        <img class="modal__doctor-photo" id="modalDoctorPhoto" src="" alt="">
+        <div>
+          <h2 class="modal__title" id="modalDoctorName"></h2>
+          <p class="modal__specialty" id="modalDoctorSpecialty"></p>
+        </div>
+      </div>
+
+      <div class="modal__body">
+        <div class="form-group">
+          <label for="bookingDate">Select a Date</label>
+          <input type="date" id="bookingDate" required>
+        </div>
+
+        <div class="form-group">
+          <label>Available Time Slots</label>
+          <div class="slot-grid" id="slotGrid">
+            <p class="slot-empty">Please select a date first.</p>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="bookingNotes">Notes (optional)</label>
+          <textarea id="bookingNotes" rows="3" placeholder="Share anything you'd like your therapist to know..."></textarea>
+        </div>
+      </div>
+
+      <div class="modal__footer">
+        <button class="btn btn--ghost" id="cancelBookingModal">Cancel</button>
+        <button class="btn btn--primary" id="confirmBooking" disabled>Confirm Booking</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast"></div>
+
+  <script src="auth.js"></script>
+  <script src="booking.js"></script>
+</body>
+</html>
