@@ -3,7 +3,7 @@
 This lab migrates the **Mental Health Booking App** from Docker Compose to a Kubernetes-based architecture running on a **K3s VM**.
 
 The project demonstrates practical Kubernetes and K3s concepts while keeping the architecture simple and easy to understand.
-
+ 
 ---
 
 ## 1. Lab Objectives
