@@ -1,0 +1,145 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: smallsteps
+
+data:
+  default.conf: |
+    server {
+        listen 80;
+        server_name _;
+
+        root /usr/share/nginx/html;
+        index index.html;
+
+        server_tokens off;
+
+        location = /nginx-health {
+            access_log off;
+            default_type text/plain;
+
+            return 200 "OK\n";
+        }
+
+        location /api/ {
+            proxy_pass http://backend-service:3000;
+
+            proxy_http_version 1.1;
+
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            proxy_connect_timeout 5s;
+            proxy_read_timeout 60s;
+            proxy_send_timeout 60s;
+        }
+
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+
+        location ~ /\. {
+            deny all;
+        }
+    }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: smallsteps
+
+spec:
+  replicas: 2
+
+  strategy:
+    type: RollingUpdate
+
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+
+  selector:
+    matchLabels:
+      app: frontend
+
+  template:
+    metadata:
+      labels:
+        app: frontend
+
+    spec:
+
+      containers:
+
+        - name: nginx
+
+          image: smallsteps-frontend:1.0
+
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http
+              containerPort: 80
+
+          volumeMounts:
+
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+              readOnly: true
+
+          readinessProbe:
+            httpGet:
+              path: /nginx-health
+              port: http
+
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+          livenessProbe:
+            httpGet:
+              path: /nginx-health
+              port: http
+
+            initialDelaySeconds: 10
+            periodSeconds: 20
+
+          resources:
+
+            requests:
+              cpu: 50m
+              memory: 64Mi
+
+            limits:
+              cpu: 250m
+              memory: 128Mi
+
+      volumes:
+
+        - name: nginx-config
+
+          configMap:
+            name: nginx-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  namespace: smallsteps
+
+spec:
+  type: ClusterIP
+
+  selector:
+    app: frontend
+
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
