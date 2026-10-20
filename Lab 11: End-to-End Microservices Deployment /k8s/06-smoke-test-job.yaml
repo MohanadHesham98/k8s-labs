@@ -1,0 +1,52 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: smallsteps-smoke-test
+  namespace: smallsteps
+
+spec:
+  backoffLimit: 5
+
+  template:
+
+    metadata:
+      labels:
+        app: smallsteps-smoke-test
+
+    spec:
+
+      restartPolicy: Never
+
+      containers:
+
+        - name: smoke-test
+
+          image: curlimages/curl:8.10.1
+
+          command:
+            - sh
+            - -c
+
+          args:
+            - |
+              set -e
+
+              echo "Testing backend..."
+
+              curl -f http://backend-service:3000/api/health
+
+              echo ""
+
+              echo "Backend test passed."
+
+              echo "Testing frontend..."
+
+              curl -f http://frontend-service/nginx-health
+
+              echo ""
+
+              echo "Frontend test passed."
+
+              echo ""
+
+              echo "All smoke tests passed."
