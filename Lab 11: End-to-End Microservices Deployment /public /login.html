@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In | Small Steps</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="auth-body">
+
+  <div class="auth-container">
+    <!-- Left Panel -->
+    <div class="auth-panel auth-panel--left">
+      <div class="auth-panel__content">
+        <a href="/" class="nav__logo nav__logo--light">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z"/>
+            <circle cx="12" cy="10" r="2"/>
+          </svg>
+          Small Steps
+        </a>
+        <h1 class="auth-panel__title">Your wellness journey<br>awaits</h1>
+        <p class="auth-panel__desc">Sign in to book therapy sessions, manage your appointments, and access personalized wellness resources.</p>
+        <div class="auth-panel__features">
+          <div class="auth-panel__feature">
+            <span class="auth-panel__feature-icon">&#x2713;</span>
+            <span>Book sessions with licensed therapists</span>
+          </div>
+          <div class="auth-panel__feature">
+            <span class="auth-panel__feature-icon">&#x2713;</span>
+            <span>Track and manage your appointments</span>
+          </div>
+          <div class="auth-panel__feature">
+            <span class="auth-panel__feature-icon">&#x2713;</span>
+            <span>Access daily wellness resources</span>
+          </div>
+        </div>
+      </div>
+      <div class="auth-panel__decor" aria-hidden="true">
+        <div class="auth-bubble auth-bubble--1"></div>
+        <div class="auth-bubble auth-bubble--2"></div>
+        <div class="auth-bubble auth-bubble--3"></div>
+      </div>
+    </div>
+
+    <!-- Right Panel - Form -->
+    <div class="auth-panel auth-panel--right">
+      <div class="auth-form-wrapper">
+        <!-- Mode Toggle -->
+        <div class="auth-mode-toggle">
+          <button class="auth-mode-btn active" data-mode="patient" id="patientModeBtn">Patient</button>
+          <button class="auth-mode-btn" data-mode="admin" id="adminModeBtn">Admin</button>
+        </div>
+
+        <!-- Login Form -->
+        <form class="auth-form active" id="loginForm">
+          <h2 class="auth-form__title">Welcome Back</h2>
+          <p class="auth-form__subtitle">Sign in to your <span id="loginRoleLabel">patient</span> account</p>
+
+          <div class="form-group">
+            <label for="loginEmail">Email Address</label>
+            <input type="email" id="loginEmail" placeholder="you@example.com" required autocomplete="email">
+          </div>
+
+          <div class="form-group">
+            <label for="loginPassword">Password</label>
+            <div class="password-field">
+              <input type="password" id="loginPassword" placeholder="Enter your password" required autocomplete="current-password">
+              <button type="button" class="password-toggle" data-target="loginPassword" aria-label="Toggle password visibility">Show</button>
+            </div>
+          </div>
+
+          <div class="auth-form__error" id="loginError"></div>
+
+          <button type="submit" class="btn btn--primary btn--block btn--lg" id="loginSubmit">Sign In</button>
+
+          <p class="auth-form__switch" id="loginSwitch">
+            Don't have an account? <a href="#" id="showRegister">Create one</a>
+          </p>
+
+          <div class="admin-hint" id="adminHint" style="display:none;">
+            <p>Demo admin credentials:</p>
+            <p><strong>admin@smallsteps.com</strong> / <strong>admin123</strong></p>
+          </div>
+        </form>
+
+        <!-- Register Form -->
+        <form class="auth-form" id="registerForm">
+          <h2 class="auth-form__title">Create Account</h2>
+          <p class="auth-form__subtitle">Join Small Steps to start your wellness journey</p>
+
+          <div class="form-group">
+            <label for="regName">Full Name</label>
+            <input type="text" id="regName" placeholder="Jane Doe" required autocomplete="name">
+          </div>
+
+          <div class="form-group">
+            <label for="regEmail">Email Address</label>
+            <input type="email" id="regEmail" placeholder="you@example.com" required autocomplete="email">
+          </div>
+
+          <div class="form-group">
+            <label for="regPassword">Password</label>
+            <div class="password-field">
+              <input type="password" id="regPassword" placeholder="Choose a password (min 6 chars)" required autocomplete="new-password">
+              <button type="button" class="password-toggle" data-target="regPassword" aria-label="Toggle password visibility">Show</button>
+            </div>
+          </div>
+
+          <div class="auth-form__error" id="registerError"></div>
+
+          <button type="submit" class="btn btn--primary btn--block btn--lg" id="registerSubmit">Create Account</button>
+
+          <p class="auth-form__switch">
+            Already have an account? <a href="#" id="showLogin">Sign in</a>
+          </p>
+        </form>
+
+        <a href="/" class="auth-back">&larr; Back to home</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="auth.js"></script>
+</body>
+</html>
