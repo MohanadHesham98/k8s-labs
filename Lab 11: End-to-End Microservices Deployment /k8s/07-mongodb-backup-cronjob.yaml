@@ -1,0 +1,67 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mongodb-backup
+  namespace: smallsteps
+
+spec:
+
+  schedule: "0 2 * * *"
+
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+
+  jobTemplate:
+
+    spec:
+
+      template:
+
+        spec:
+
+          restartPolicy: OnFailure
+
+          containers:
+
+            - name: mongodb-backup
+
+              image: mongo:7
+
+              command:
+                - /bin/sh
+                - -c
+
+              args:
+                - |
+                  set -e
+
+                  DATE=$(date +%Y-%m-%d-%H%M)
+
+                  echo "Starting MongoDB backup: $DATE"
+
+                  mongodump \
+                    --host mongodb-0.mongodb-headless.smallsteps.svc.cluster.local \
+                    --port 27017 \
+                    --username "$MONGO_USERNAME" \
+                    --password "$MONGO_PASSWORD" \
+                    --authenticationDatabase admin \
+                    --db smallsteps \
+                    --archive="/tmp/smallsteps-$DATE.archive"
+
+                  echo "MongoDB backup completed."
+
+              env:
+
+                - name: MONGO_USERNAME
+
+                  valueFrom:
+                    secretKeyRef:
+                      name: smallsteps-secret
+                      key: MONGO_ROOT_USERNAME
+
+                - name: MONGO_PASSWORD
+
+                  valueFrom:
+                    secretKeyRef:
+                      name: smallsteps-secret
+                      key: MONGO_ROOT_PASSWORD
