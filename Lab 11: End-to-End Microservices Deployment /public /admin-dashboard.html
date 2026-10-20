@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard | Small Steps</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="dashboard-body dashboard-body--admin">
+
+  <!-- Top Nav -->
+  <nav class="dash-nav dash-nav--admin">
+    <div class="dash-nav__inner">
+      <a href="/" class="nav__logo nav__logo--light">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z"/>
+          <circle cx="12" cy="10" r="2"/>
+        </svg>
+        Small Steps <span class="nav__admin-badge">Admin</span>
+      </a>
+      <div class="dash-nav__links">
+        <button class="dash-nav__tab active" data-tab="overview">Overview</button>
+        <button class="dash-nav__tab" data-tab="doctors">Doctors</button>
+        <button class="dash-nav__tab" data-tab="bookings">All Bookings</button>
+      </div>
+      <div class="dash-nav__user">
+        <span class="dash-nav__greeting" id="adminGreeting">Admin</span>
+        <button class="btn btn--outline btn--sm btn--light" id="logoutBtn">Sign Out</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="dash-main">
+
+    <!-- Overview Tab -->
+    <section class="dash-tab active" id="tab-overview">
+      <div class="container">
+        <div class="dash-head">
+          <div>
+            <h1 class="dash-title">Dashboard Overview</h1>
+            <p class="dash-subtitle">A snapshot of your therapy practice.</p>
+          </div>
+        </div>
+
+        <div class="stats-grid" id="statsGrid">
+          <div class="stat-card stat-card--blue">
+            <div class="stat-card__icon">&#x1F4C9;</div>
+            <div class="stat-card__info">
+              <span class="stat-card__num" id="statTotal">0</span>
+              <span class="stat-card__label">Total Bookings</span>
+            </div>
+          </div>
+          <div class="stat-card stat-card--sage">
+            <div class="stat-card__icon">&#x23F3;</div>
+            <div class="stat-card__info">
+              <span class="stat-card__num" id="statPending">0</span>
+              <span class="stat-card__label">Pending</span>
+            </div>
+          </div>
+          <div class="stat-card stat-card--green">
+            <div class="stat-card__icon">&#x2705;</div>
+            <div class="stat-card__info">
+              <span class="stat-card__num" id="statConfirmed">0</span>
+              <span class="stat-card__label">Confirmed</span>
+            </div>
+          </div>
+          <div class="stat-card stat-card--peach">
+            <div class="stat-card__icon">&#x1F468;</div>
+            <div class="stat-card__info">
+              <span class="stat-card__num" id="statDoctors">0</span>
+              <span class="stat-card__label">Doctors</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="recent-section">
+          <h2 class="section__title">Recent Bookings</h2>
+          <div class="bookings-list" id="recentBookingsList">
+            <div class="loading-state">Loading recent bookings...</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Doctors Tab -->
+    <section class="dash-tab" id="tab-doctors">
+      <div class="container">
+        <div class="dash-head">
+          <div>
+            <h1 class="dash-title">Doctor Management</h1>
+            <p class="dash-subtitle">Add, edit, or remove therapists from the platform.</p>
+          </div>
+          <button class="btn btn--primary" id="addDoctorBtn">+ Add Doctor</button>
+        </div>
+
+        <div class="doctor-grid doctor-grid--admin" id="adminDoctorGrid">
+          <div class="loading-state">Loading doctors...</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- All Bookings Tab -->
+    <section class="dash-tab" id="tab-bookings">
+      <div class="container">
+        <div class="dash-head">
+          <div>
+            <h1 class="dash-title">All Bookings</h1>
+            <p class="dash-subtitle">Manage every patient booking across all therapists.</p>
+          </div>
+          <div class="booking-filter">
+            <select id="adminBookingFilter">
+              <option value="all">All Statuses</option>
+              <option value="Pending">Pending</option>
+              <option value="Confirmed">Confirmed</option>
+              <option value="Completed">Completed</option>
+              <option value="Cancelled">Cancelled</option>
+              <option value="Rejected">Rejected</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="bookings-list" id="adminBookingsList">
+          <div class="loading-state">Loading all bookings...</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Doctor Modal -->
+  <div class="modal-overlay" id="doctorModal">
+    <div class="modal">
+      <button class="modal__close" id="closeDoctorModal">&times;</button>
+      <h2 class="modal__title" id="doctorModalTitle">Add New Doctor</h2>
+
+      <div class="modal__body">
+        <input type="hidden" id="doctorEditId">
+
+        <div class="form-group">
+          <label for="doctorName">Doctor Name</label>
+          <input type="text" id="doctorName" placeholder="Dr. Jane Doe" required>
+        </div>
+
+        <div class="form-group">
+          <label for="doctorSpecialty">Specialty</label>
+          <input type="text" id="doctorSpecialty" placeholder="e.g. Cognitive Behavioral Therapy" required>
+        </div>
+
+        <div class="form-group">
+          <label for="doctorExperience">Experience</label>
+          <input type="text" id="doctorExperience" placeholder="e.g. 10 years">
+        </div>
+
+        <div class="form-group">
+          <label for="doctorPhoto">Photo URL</label>
+          <input type="url" id="doctorPhoto" placeholder="https://example.com/photo.jpg">
+        </div>
+
+        <div class="form-group">
+          <label for="doctorSlots">Available Time Slots (comma-separated)</label>
+          <input type="text" id="doctorSlots" placeholder="09:00, 11:00, 14:00, 16:00">
+        </div>
+
+        <div class="form-group">
+          <label for="doctorBio">Bio (optional)</label>
+          <textarea id="doctorBio" rows="3" placeholder="Brief description of the doctor's approach..."></textarea>
+        </div>
+      </div>
+
+      <div class="modal__footer">
+        <button class="btn btn--ghost" id="cancelDoctorModal">Cancel</button>
+        <button class="btn btn--primary" id="saveDoctorBtn">Save Doctor</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Booking Status Modal -->
+  <div class="modal-overlay" id="bookingStatusModal">
+    <div class="modal modal--sm">
+      <button class="modal__close" id="closeStatusModal">&times;</button>
+      <h2 class="modal__title">Manage Booking</h2>
+      <div class="modal__body" id="bookingStatusBody"></div>
+      <div class="modal__footer" id="bookingStatusFooter"></div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script src="auth.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>
