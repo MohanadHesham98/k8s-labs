@@ -1983,6 +1983,7 @@ You should see:
 smallsteps-backend:1.0
 smallsteps-frontend:1.0
 ```
+<img width="1130" height="188" alt="image" src="https://github.com/user-attachments/assets/d5f9a002-45e0-4250-9467-f8852b55b6cc" />
 
 ---
 
@@ -2031,6 +2032,7 @@ Verify:
 ```bash
 kubectl get ns smallsteps
 ```
+<img width="604" height="73" alt="image" src="https://github.com/user-attachments/assets/85dfbc2a-59f6-4062-a6e8-57a96ff9af3f" />
 
 ---
 
@@ -2045,10 +2047,12 @@ Verify:
 ```bash
 kubectl get configmap -n smallsteps
 ```
+<img width="692" height="73" alt="image" src="https://github.com/user-attachments/assets/fd07d065-17fe-47f9-bd03-1c33c335ca01" />
 
 ```bash
 kubectl get secret -n smallsteps
 ```
+<img width="663" height="77" alt="image" src="https://github.com/user-attachments/assets/3de79693-f7ba-47f5-bf3d-26fa2e6714a2" />
 
 ---
 
@@ -2075,6 +2079,7 @@ Press:
 ```text
 CTRL+C
 ```
+<img width="680" height="78" alt="image" src="https://github.com/user-attachments/assets/41f394d7-7052-4fea-adb4-8a96e6ecc38b" />
 
 Check PVC:
 
@@ -2087,12 +2092,14 @@ Expected:
 ```text
 mongodb-data-mongodb-0   Bound   2Gi
 ```
+<img width="1122" height="113" alt="image" src="https://github.com/user-attachments/assets/b844bb8d-f7c8-4ae7-8011-f4a60fd2b255" />
 
 Check PV:
 
 ```bash
 kubectl get pv
 ```
+<img width="1121" height="111" alt="image" src="https://github.com/user-attachments/assets/f10907b0-d392-492b-b3d9-9474a4d5be20" />
 
 ---
 
@@ -2107,6 +2114,7 @@ Check:
 ```bash
 kubectl get pods -n smallsteps -l app=backend
 ```
+<img width="819" height="94" alt="image" src="https://github.com/user-attachments/assets/26b3727b-31d5-4543-92f5-738204b4acdb" />
 
 Wait:
 
@@ -2125,6 +2133,7 @@ Check Service:
 ```bash
 kubectl get svc backend-service -n smallsteps
 ```
+<img width="782" height="75" alt="image" src="https://github.com/user-attachments/assets/b4ffca5a-88d2-486b-9063-2d177fae22c8" />
 
 ---
 
@@ -2139,6 +2148,7 @@ Check:
 ```bash
 kubectl get pods -n smallsteps -l app=frontend
 ```
+<img width="802" height="76" alt="image" src="https://github.com/user-attachments/assets/444fd9b3-0cdc-4b6f-9e74-c5f1977b155e" />
 
 Wait:
 
@@ -2151,6 +2161,7 @@ Check Service:
 ```bash
 kubectl get svc frontend-service -n smallsteps
 ```
+<img width="789" height="75" alt="image" src="https://github.com/user-attachments/assets/d56c2dc7-deb3-4d2e-b203-3c56054583a3" />
 
 ---
 
@@ -2167,12 +2178,14 @@ Check:
 ```bash
 kubectl get ingress -n smallsteps
 ```
+<img width="734" height="76" alt="image" src="https://github.com/user-attachments/assets/808b503a-e677-40a2-9be4-76339a4a9644" />
 
 Describe:
 
 ```bash
 kubectl describe ingress smallsteps-ingress -n smallsteps
 ```
+<img width="904" height="398" alt="image" src="https://github.com/user-attachments/assets/e02a2fe4-54c2-4240-b06d-747aef3bafb6" />
 
 ---
 
@@ -2187,7 +2200,7 @@ hostname -I
 Example:
 
 ```text
-192.168.107.198
+192.168.107.200
 ```
 
 Use your actual VM IP.
@@ -2209,7 +2222,7 @@ Run Notepad as Administrator.
 Add:
 
 ```text
-192.168.107.198 smallsteps.local
+192.168.107.200 smallsteps.local
 ```
 
 Replace the example IP with the actual VM IP.
@@ -2225,11 +2238,12 @@ From Windows CMD:
 ```cmd
 ping smallsteps.local
 ```
+<img width="808" height="397" alt="image" src="https://github.com/user-attachments/assets/3c6f600e-741e-4e18-9e2a-c777535b96b8" />
 
 You should see something similar to:
 
 ```text
-Pinging smallsteps.local [192.168.107.198]
+Pinging smallsteps.local [192.168.107.200]
 ```
 
 The important part is that the hostname resolves to the VM IP.
@@ -2243,36 +2257,42 @@ The important part is that the hostname resolves to the VM IP.
 ```bash
 kubectl get all -n smallsteps
 ```
+<img width="902" height="451" alt="image" src="https://github.com/user-attachments/assets/63ab01db-dd76-48ab-be9f-136d5a2702ac" />
 
 Check PVC:
 
 ```bash
 kubectl get pvc -n smallsteps
 ```
+<img width="1121" height="96" alt="image" src="https://github.com/user-attachments/assets/fdd1b751-6b74-49c3-ac91-728d5372b27d" />
 
 Check Ingress:
 
 ```bash
 kubectl get ingress -n smallsteps
 ```
+<img width="683" height="77" alt="image" src="https://github.com/user-attachments/assets/c5fa97c2-4dd3-46b3-84d3-a409144831b4" />
 
 Check Jobs:
 
 ```bash
 kubectl get jobs -n smallsteps
 ```
+<img width="693" height="61" alt="image" src="https://github.com/user-attachments/assets/ec82347f-8f7c-4d1e-a680-bb210d40f169" />
 
 Check CronJobs:
 
 ```bash
 kubectl get cronjobs -n smallsteps
 ```
+<img width="764" height="60" alt="image" src="https://github.com/user-attachments/assets/aaf9face-4abe-4d89-877d-cce51f46d56e" />
 
 Check HPA:
 
 ```bash
 kubectl get hpa -n smallsteps
 ```
+<img width="844" height="77" alt="image" src="https://github.com/user-attachments/assets/925eab8b-d7de-4217-b952-8bca9e1aa166" />
 
 ---
 
@@ -2286,12 +2306,14 @@ kubectl port-forward \
   3000:3000 \
   -n smallsteps
 ```
+<img width="657" height="147" alt="image" src="https://github.com/user-attachments/assets/f228f471-52f8-4e52-9ac4-256e25ed69bb" />
 
 From another terminal:
 
 ```bash
 curl http://127.0.0.1:3000/api/health
 ```
+<img width="1125" height="136" alt="image" src="https://github.com/user-attachments/assets/421896d7-ee58-4ede-8b0f-6dfb63e82fbb" />
 
 Expected:
 
@@ -2323,109 +2345,15 @@ Open:
 ```text
 http://localhost:8080
 ```
+<img width="827" height="350" alt="image" src="https://github.com/user-attachments/assets/a7f2932b-3bb5-4992-bbe3-d2378ca339c1" />
+
+<img width="1852" height="817" alt="image" src="https://github.com/user-attachments/assets/5376aa96-a0bc-4e28-8543-a16f9449fcca" />
 
 Stop:
 
 ```text
 CTRL+C
 ```
-
----
-
-# 47. Test Internal Kubernetes DNS
-
-Create a temporary curl Pod:
-
-```bash
-kubectl run test-client \
-  -n smallsteps \
-  --image=curlimages/curl:8.10.1 \
-  --rm \
-  -it \
-  -- sh
-```
-
-Inside the Pod:
-
-```bash
-curl http://backend-service:3000/api/health
-```
-
-Then:
-
-```bash
-curl http://frontend-service/nginx-health
-```
-
-Exit:
-
-```bash
-exit
-```
-
-This proves Kubernetes Service discovery works.
-
----
-
-# 48. Test MongoDB DNS
-
-Run:
-
-```bash
-kubectl run dns-test \
-  -n smallsteps \
-  --image=busybox:1.36 \
-  --rm \
-  -it \
-  -- sh
-```
-
-Inside:
-
-```bash
-nslookup mongodb-0.mongodb-headless.smallsteps.svc.cluster.local
-```
-
-Exit:
-
-```bash
-exit
-```
-
----
-
-# 49. Test Ingress from the VM
-
-Find VM IP:
-
-```bash
-hostname -I
-```
-
-Then:
-
-```bash
-curl \
-  -H "Host: smallsteps.local" \
-  http://YOUR_VM_IP/
-```
-
-Test API:
-
-```bash
-curl \
-  -H "Host: smallsteps.local" \
-  http://YOUR_VM_IP/api/health
-```
-
-Replace:
-
-```text
-YOUR_VM_IP
-```
-
-with the real VM IP.
-
 ---
 
 # 50. Test from Browser
@@ -2435,6 +2363,7 @@ Open:
 ```text
 http://smallsteps.local
 ```
+<img width="1920" height="1019" alt="image" src="https://github.com/user-attachments/assets/10fbf794-d9b1-4daf-9baf-6a355915cd32" />
 
 The request flow is:
 
