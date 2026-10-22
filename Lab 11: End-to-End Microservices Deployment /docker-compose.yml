@@ -6,6 +6,7 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
+      target: backend
     container_name: smallsteps-app
     restart: unless-stopped
     expose:
@@ -18,7 +19,9 @@ services:
     volumes:
       - app-data:/app/data
     networks:
-      - smallsteps-net
+      smallsteps-net:
+        aliases:
+          - backend-service
     depends_on:
       mongo:
         condition: service_healthy
@@ -45,10 +48,11 @@ services:
     networks:
       - smallsteps-net
     healthcheck:
-      test: mongosh --username ${MONGO_USER:-smallsteps} --password ${MONGO_PASS:-smallsteps_pass} --authenticationDatabase admin --eval "db.adminCommand('ping')" --quiet
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 20s
 
   # --- Nginx Reverse Proxy ---
   nginx:
@@ -59,7 +63,7 @@ services:
       - "80:80"
     volumes:
       - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./public:/app/www:ro
+      - ./public:/usr/share/nginx/html:ro
       - nginx-logs:/var/log/nginx
     networks:
       - smallsteps-net
