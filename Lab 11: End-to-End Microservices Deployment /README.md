@@ -1902,6 +1902,7 @@ Expected:
 smallsteps-backend
 smallsteps-frontend
 ```
+<img width="885" height="131" alt="image" src="https://github.com/user-attachments/assets/ada88a43-a63e-4c7e-b9ed-ac82672dc32b" />
 
 ---
 
@@ -1924,8 +1925,9 @@ docker compose ps
 Test the API:
 
 ```bash
-curl http://localhost:3000/api/health
+curl http://localhost/api/health
 ```
+<img width="910" height="260" alt="image" src="https://github.com/user-attachments/assets/85beb8c4-e729-41a8-93ad-a228dbc97621" />
 
 When finished:
 
