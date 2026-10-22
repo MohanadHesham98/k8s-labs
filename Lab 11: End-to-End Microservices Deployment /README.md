@@ -1,42 +1,33 @@
 # Lab 11: Mental Health Booking App on K3s with NGINX Ingress
 
-This lab migrates the **Mental Health Booking App** from Docker Compose to a Kubernetes-based architecture running on a **K3s VM**.
+This lab migrates the **Mental Health Booking App** from Docker Compose to Kubernetes using **K3s** and **NGINX Ingress Controller**.
 
-The project demonstrates practical Kubernetes and K3s concepts while keeping the architecture simple and easy to understand.
- 
----
-
-## 1. Lab Objectives
-
-By completing this lab, you will practice:
+The project keeps the architecture simple while demonstrating important Kubernetes concepts:
 
 - Docker multi-stage builds
-- Docker networking
-- NGINX reverse proxy
 - K3s
-- Kubernetes Namespaces
-- ConfigMaps
-- Secrets
-- Deployments
-- StatefulSets
-- PersistentVolumeClaims
+- Namespace
+- ConfigMap
+- Secret
+- Deployment
+- StatefulSet
+- PersistentVolumeClaim
 - K3s `local-path` StorageClass
-- Headless Services
-- ClusterIP Services
-- Kubernetes Jobs
-- Kubernetes CronJobs
-- Liveness Probes
-- Readiness Probes
-- Startup Probes
+- Headless Service
+- ClusterIP Service
+- Kubernetes Job
+- Kubernetes CronJob
+- Liveness, Readiness and Startup Probes
 - Rolling Updates
 - Horizontal Pod Autoscaling
+- NGINX
 - NGINX Ingress Controller
 - Kubernetes DNS
-- Internal service discovery
-- Local DNS using `/etc/hosts`
-- Kubernetes troubleshooting
+- `/etc/hosts`
 
-The final architecture remains intentionally small:
+---
+
+# 1. Architecture
 
 ```text
                          Browser
@@ -57,15 +48,14 @@ The final architecture remains intentionally small:
                  v                   v
        +------------------+   +------------------+
        | backend-service  |   | frontend-service |
-       |    ClusterIP     |   |    ClusterIP     |
-       |      :3000       |   |       :80        |
+       | ClusterIP :3000  |   | ClusterIP :80    |
        +--------+---------+   +--------+---------+
                 |                      |
                 v                      v
        +------------------+   +------------------+
        | Backend Pods     |   | NGINX Pods       |
        | Deployment       |   | Deployment       |
-       | replicas: 2      |   | replicas: 2      |
+       | 2 replicas       |   | 2 replicas       |
        +--------+---------+   +------------------+
                 |
                 v
@@ -85,17 +75,30 @@ The final architecture remains intentionally small:
        | MongoDB PVC          |
        | 2Gi / local-path     |
        +----------------------+
+```
 
-       Additional Kubernetes resources:
+### Request Flow
 
-       Job       -> Application smoke test
-       CronJob   -> MongoDB backup demonstration
-       HPA       -> Backend autoscaling
+```text
+Browser
+   |
+   v
+NGINX Ingress
+   |
+   +---- / ------------> frontend-service:80
+   |
+   +---- /api ---------> backend-service:3000
+                              |
+                              v
+                       mongodb-headless
+                              |
+                              v
+                           MongoDB
 ```
 
 ---
 
-# 2. Existing Application
+# 2. Application
 
 The original application contains:
 
@@ -107,9 +110,12 @@ mental-health-booking-app/
 ├── docker/
 │   ├── Dockerfile
 │   └── nginx.conf
+├── k8s/
 ├── .env.example
 ├── docker-compose.yml
-└── package.json
+├── package.json
+├── package-lock.json
+└── README.md
 ```
 
 The application consists of:
@@ -127,25 +133,15 @@ Node.js / Express
 MongoDB
 ```
 
-The Express application listens on:
+### Application Ports
 
-```text
-3000
-```
+| Component | Port |
+|---|---:|
+| NGINX | 80 |
+| Node.js / Express | 3000 |
+| MongoDB | 27017 |
 
-MongoDB listens on:
-
-```text
-27017
-```
-
-NGINX listens on:
-
-```text
-80
-```
-
-Application API endpoints include:
+### API Endpoints
 
 ```text
 /api/auth/*
@@ -157,8 +153,6 @@ Application API endpoints include:
 ---
 
 # 3. Final Project Structure
-
-The final project should look like this:
 
 ```text
 mental-health-booking-app/
@@ -198,7 +192,7 @@ mental-health-booking-app/
 
 # 4. Kubernetes Components
 
-| Component | Kubernetes Resource | Port | Exposure | Storage |
+| Component | Resource | Port | Exposure | Storage |
 |---|---|---:|---|---|
 | NGINX Ingress | Ingress Controller | 80/443 | External | None |
 | Frontend | Deployment | 80 | ClusterIP | None |
@@ -213,316 +207,15 @@ mental-health-booking-app/
 
 ---
 
-# 5. VM Requirements
+# 5. Docker Configuration
 
-The lab is designed for a Linux VM.
-
-Recommended minimum:
-
-```text
-CPU:      2 vCPU
-RAM:      4 GB
-Disk:     20 GB+
-OS:       Ubuntu 22.04 / Ubuntu 24.04
-Network:  VM reachable from your host machine
-```
-
-Check the VM:
-
-```bash
-hostname
-```
-
-```bash
-hostname -I
-```
-
-```bash
-ip addr
-```
-
----
-
-# 6. Verify K3s
-
-Check K3s:
-
-```bash
-k3s --version
-```
-
-Check Kubernetes:
-
-```bash
-kubectl version --client
-```
-
-Check the node:
-
-```bash
-kubectl get nodes -o wide
-```
-
-Expected:
-
-```text
-NAME   STATUS   ROLES                  AGE   VERSION
-test   Ready    control-plane,master   ...   v1...
-```
-
-Your actual node name/version may be different.
-
----
-
-# 7. Verify K3s Storage
-
-K3s normally provides the `local-path` StorageClass.
-
-Run:
-
-```bash
-kubectl get storageclass
-```
-
-Expected:
-
-```text
-NAME                   PROVISIONER
-local-path (default)   rancher.io/local-path
-```
-
-This project will use:
-
-```text
-local-path
-```
-
-for MongoDB persistence.
-
----
-
-# 8. Disable Traefik
-
-K3s normally installs Traefik as its default Ingress controller.
-
-This lab will use:
-
-```text
-NGINX Ingress Controller
-```
-
-instead.
-
-We should not run both controllers for this lab.
-
----
-
-## 8.1 Check Traefik
-
-Run:
-
-```bash
-kubectl get pods -n kube-system | grep traefik
-```
-
-Also:
-
-```bash
-kubectl get svc -n kube-system | grep traefik
-```
-
-If Traefik exists, continue.
-
----
-
-# 9. Configure K3s to Disable Traefik
-
-Open:
-
-```bash
-sudo nano /etc/rancher/k3s/config.yaml
-```
-
-If the file does not exist:
-
-```bash
-sudo mkdir -p /etc/rancher/k3s
-sudo touch /etc/rancher/k3s/config.yaml
-```
-
-Add:
-
-```yaml
-disable:
-  - traefik
-```
-
-If the file already contains other settings, keep them.
-
-Example:
-
-```yaml
-write-kubeconfig-mode: "0644"
-
-disable:
-  - traefik
-```
-
-Save:
-
-```text
-CTRL + O
-ENTER
-CTRL + X
-```
-
----
-
-# 10. Restart K3s
-
-Run:
-
-```bash
-sudo systemctl restart k3s
-```
-
-Check:
-
-```bash
-sudo systemctl status k3s --no-pager
-```
-
-Wait:
-
-```bash
-sleep 10
-```
-
-Check:
-
-```bash
-kubectl get nodes
-```
-
-The node must become:
-
-```text
-Ready
-```
-
----
-
-# 11. Verify Traefik Is Disabled
-
-Run:
-
-```bash
-kubectl get pods -n kube-system
-```
-
-There should be no running Traefik Pod.
-
-Check:
-
-```bash
-kubectl get svc -n kube-system
-```
-
-There should be no active Traefik Service.
-
-You can also check:
-
-```bash
-kubectl get helmcharts -n kube-system
-```
-
----
-
-# 12. Install NGINX Ingress Controller
-
-Add the Helm repository:
-
-```bash
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-```
-
-Update:
-
-```bash
-helm repo update
-```
-
-Create the namespace:
-
-```bash
-kubectl create namespace ingress-nginx
-```
-
-Install NGINX Ingress:
-
-```bash
-helm install ingress-nginx ingress-nginx/ingress-nginx \
-  --namespace ingress-nginx
-```
-
-Check:
-
-```bash
-kubectl get pods -n ingress-nginx
-```
-
-Wait until the controller is:
-
-```text
-Running
-```
-
-Check:
-
-```bash
-kubectl get svc -n ingress-nginx
-```
-
-Check the Helm release:
-
-```bash
-helm list -n ingress-nginx
-```
-
----
-
-# 13. Verify Ingress Class
-
-Run:
-
-```bash
-kubectl get ingressclass
-```
-
-Expected:
-
-```text
-NAME
-nginx
-```
-
-The Kubernetes Ingress resource will explicitly use:
-
-```yaml
-ingressClassName: nginx
-```
-
----
-
-# 14. Dockerfile
+## 5.1 Multi-Stage Dockerfile
 
 File:
 
 ```text
 docker/Dockerfile
 ```
-
-Use the following complete file:
 
 ```dockerfile
 # syntax=docker/dockerfile:1
@@ -584,15 +277,13 @@ CMD ["nginx", "-g", "daemon off;"]
 
 ---
 
-# 15. NGINX Configuration
+# 6. NGINX Configuration
 
 File:
 
 ```text
 docker/nginx.conf
 ```
-
-Complete content:
 
 ```nginx
 server {
@@ -638,94 +329,26 @@ server {
 
 ---
 
-# 16. Update server.js
+# 7. Kubernetes Files
 
-The Node.js application must listen on all interfaces inside the container.
-
-Find the existing `app.listen()` code.
-
-Use:
-
-```javascript
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on port ${PORT}`);
-});
-```
-
-The important part is:
+The Kubernetes manifests remain unchanged.
 
 ```text
-0.0.0.0
-```
-
-Do not use:
-
-```text
-localhost
-```
-
-or:
-
-```text
-127.0.0.1
-```
-
-for the container listener.
-
-Kubernetes needs to reach the application through the Pod network.
-
-Keep your existing API routes:
-
-```text
-/api/auth/*
-/api/doctors
-/api/bookings
-/api/health
+k8s/
+├── 00-namespace.yaml
+├── 01-configmap-secret.yaml
+├── 02-mongodb-statefulset.yaml
+├── 03-backend-deployment.yaml
+├── 04-frontend-deployment.yaml
+├── 05-ingress.yaml
+├── 06-smoke-test-job.yaml
+├── 07-mongodb-backup-cronjob.yaml
+└── 08-backend-hpa.yaml
 ```
 
 ---
 
-# 17. .dockerignore
-
-File:
-
-```text
-.dockerignore
-```
-
-Content:
-
-```dockerignore
-.git
-.gitignore
-
-node_modules
-
-npm-debug.log*
-yarn-debug.log*
-pnpm-debug.log*
-
-.env
-.env.*
-
-coverage
-.nyc_output
-
-*.log
-
-.DS_Store
-
-.vscode
-.idea
-
-k8s
-```
-
----
-
-# 18. Namespace
+# 8. Namespace
 
 File:
 
@@ -746,15 +369,9 @@ Apply:
 kubectl apply -f k8s/00-namespace.yaml
 ```
 
-Verify:
-
-```bash
-kubectl get namespace smallsteps
-```
-
 ---
 
-# 19. ConfigMap and Secret
+# 9. ConfigMap and Secret
 
 File:
 
@@ -774,6 +391,7 @@ data:
   MONGO_DATABASE: "smallsteps"
 
 ---
+
 apiVersion: v1
 kind: Secret
 metadata:
@@ -793,29 +411,11 @@ Apply:
 kubectl apply -f k8s/01-configmap-secret.yaml
 ```
 
-Verify:
-
-```bash
-kubectl get configmap -n smallsteps
-```
-
-```bash
-kubectl get secret -n smallsteps
-```
-
-### Important
-
-These credentials are suitable for a lab.
-
-Do not commit real production credentials to Git.
-
-For an actual production environment, use an external secret-management solution or inject secrets securely through your deployment system.
-
 ---
 
-# 20. MongoDB StatefulSet
+# 10. MongoDB StatefulSet
 
-MongoDB should be a StatefulSet because it is a stateful workload.
+MongoDB uses a **StatefulSet** because it is a stateful workload and requires persistent storage.
 
 File:
 
@@ -841,6 +441,7 @@ spec:
       targetPort: 27017
 
 ---
+
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -962,97 +563,28 @@ Apply:
 kubectl apply -f k8s/02-mongodb-statefulset.yaml
 ```
 
-Check:
-
-```bash
-kubectl get statefulset -n smallsteps
-```
-
-Check Pod:
+Verify:
 
 ```bash
 kubectl get pods -n smallsteps
-```
-
-Check PVC:
-
-```bash
 kubectl get pvc -n smallsteps
 ```
 
 Expected:
 
 ```text
-STATUS
-Bound
-```
-
-Check PV:
-
-```bash
-kubectl get pv
-```
-
----
-
-# 21. Verify MongoDB
-
-Check logs:
-
-```bash
-kubectl logs mongodb-0 -n smallsteps
-```
-
-Check:
-
-```bash
-kubectl describe pod mongodb-0 -n smallsteps
-```
-
-The MongoDB Pod should eventually become:
-
-```text
-Running
+mongodb-0   1/1   Running
 ```
 
 and:
 
 ```text
-READY 1/1
+mongodb-data-mongodb-0   Bound   2Gi
 ```
 
 ---
 
-# 22. MongoDB StatefulSet DNS
-
-Because MongoDB uses a StatefulSet and Headless Service:
-
-```text
-StatefulSet:
-mongodb
-
-Pod:
-mongodb-0
-
-Headless Service:
-mongodb-headless
-```
-
-The stable DNS name is:
-
-```text
-mongodb-0.mongodb-headless.smallsteps.svc.cluster.local
-```
-
-This hostname is used by:
-
-```text
-MONGODB_URI
-```
-
----
-
-# 23. Backend Deployment
+# 11. Backend Deployment
 
 File:
 
@@ -1150,7 +682,6 @@ spec:
             periodSeconds: 20
 
           resources:
-
             requests:
               cpu: 100m
               memory: 128Mi
@@ -1160,6 +691,7 @@ spec:
               memory: 512Mi
 
 ---
+
 apiVersion: v1
 kind: Service
 metadata:
@@ -1184,39 +716,16 @@ Apply:
 kubectl apply -f k8s/03-backend-deployment.yaml
 ```
 
-Check:
-
-```bash
-kubectl get deployment -n smallsteps
-```
-
-Check Pods:
+Verify:
 
 ```bash
 kubectl get pods -n smallsteps -l app=backend
-```
-
-Check Service:
-
-```bash
-kubectl get svc backend-service -n smallsteps
-```
-
-Check rollout:
-
-```bash
 kubectl rollout status deployment/backend -n smallsteps
 ```
 
 ---
 
-# 24. Frontend NGINX Deployment
-
-The frontend Deployment will use NGINX.
-
-The static website comes from the Docker image.
-
-The NGINX configuration is mounted from a Kubernetes ConfigMap.
+# 12. Frontend NGINX Deployment
 
 File:
 
@@ -1274,6 +783,7 @@ data:
     }
 
 ---
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -1314,7 +824,6 @@ spec:
               containerPort: 80
 
           volumeMounts:
-
             - name: nginx-config
               mountPath: /etc/nginx/conf.d/default.conf
               subPath: default.conf
@@ -1337,7 +846,6 @@ spec:
             periodSeconds: 20
 
           resources:
-
             requests:
               cpu: 50m
               memory: 64Mi
@@ -1354,6 +862,7 @@ spec:
             name: nginx-config
 
 ---
+
 apiVersion: v1
 kind: Service
 metadata:
@@ -1378,45 +887,16 @@ Apply:
 kubectl apply -f k8s/04-frontend-deployment.yaml
 ```
 
-Check:
-
-```bash
-kubectl get deployment -n smallsteps
-```
+Verify:
 
 ```bash
 kubectl get pods -n smallsteps -l app=frontend
-```
-
-Check:
-
-```bash
 kubectl rollout status deployment/frontend -n smallsteps
 ```
 
 ---
 
-# 25. NGINX Ingress
-
-The application will use:
-
-```text
-smallsteps.local
-```
-
-Ingress rules:
-
-```text
-/api
-   |
-   v
-backend-service:3000
-
-/
-   |
-   v
-frontend-service:80
-```
+# 13. NGINX Ingress
 
 File:
 
@@ -1455,7 +935,6 @@ spec:
             backend:
               service:
                 name: backend-service
-
                 port:
                   number: 3000
 
@@ -1465,7 +944,6 @@ spec:
             backend:
               service:
                 name: frontend-service
-
                 port:
                   number: 80
 ```
@@ -1476,77 +954,17 @@ Apply:
 kubectl apply -f k8s/05-ingress.yaml
 ```
 
-Check:
+Verify:
 
 ```bash
 kubectl get ingress -n smallsteps
 ```
 
-Describe:
-
-```bash
-kubectl describe ingress smallsteps-ingress -n smallsteps
-```
-
 ---
 
-# 26. Important Ingress Routing
+# 14. Kubernetes Job
 
-The browser sends:
-
-```text
-http://smallsteps.local/
-```
-
-The NGINX Ingress Controller sends it to:
-
-```text
-frontend-service:80
-```
-
-For:
-
-```text
-http://smallsteps.local/api/health
-```
-
-the Ingress sends the request to:
-
-```text
-backend-service:3000
-```
-
-The architecture is therefore:
-
-```text
-Browser
-   |
-   v
-NGINX Ingress
-   |
-   +------ / --------> frontend-service
-   |
-   +------ /api -----> backend-service
-                            |
-                            v
-                    mongodb-headless
-                            |
-                            v
-                        MongoDB
-```
-
----
-
-# 27. Kubernetes Job
-
-A Job is useful for demonstrating one-time Kubernetes workloads.
-
-This Job will test:
-
-```text
-Backend
-Frontend
-```
+The Job performs a simple smoke test for the backend and frontend.
 
 File:
 
@@ -1621,29 +1039,17 @@ Check:
 kubectl get jobs -n smallsteps
 ```
 
-Check logs:
+Logs:
 
 ```bash
 kubectl logs job/smallsteps-smoke-test -n smallsteps
 ```
 
-Expected:
-
-```text
-Testing backend...
-Backend test passed.
-
-Testing frontend...
-Frontend test passed.
-
-All smoke tests passed.
-```
-
 ---
 
-# 28. MongoDB CronJob
+# 15. MongoDB CronJob
 
-A CronJob demonstrates scheduled Kubernetes workloads.
+The CronJob demonstrates scheduled Kubernetes workloads.
 
 File:
 
@@ -1659,7 +1065,6 @@ metadata:
   namespace: smallsteps
 
 spec:
-
   schedule: "0 2 * * *"
 
   successfulJobsHistoryLimit: 3
@@ -1727,67 +1132,17 @@ Apply:
 kubectl apply -f k8s/07-mongodb-backup-cronjob.yaml
 ```
 
-Check:
+Verify:
 
 ```bash
-kubectl get cronjob -n smallsteps
+kubectl get cronjobs -n smallsteps
 ```
 
 ---
 
-# 29. Test CronJob Immediately
+# 16. Backend HPA
 
-The scheduled time is:
-
-```text
-02:00
-```
-
-You do not need to wait.
-
-Create a test Job:
-
-```bash
-kubectl create job \
-  --from=cronjob/mongodb-backup \
-  mongodb-backup-test \
-  -n smallsteps
-```
-
-Check:
-
-```bash
-kubectl get jobs -n smallsteps
-```
-
-Check logs:
-
-```bash
-kubectl logs job/mongodb-backup-test -n smallsteps
-```
-
-Expected:
-
-```text
-Starting MongoDB backup...
-MongoDB backup completed.
-```
-
-### Important
-
-This is a Kubernetes learning demonstration.
-
-The backup file is created inside the temporary Job container.
-
-For a real production backup solution, send the backup to durable external storage such as S3-compatible object storage.
-
----
-
-# 30. Backend HPA
-
-The backend already has two replicas.
-
-We can demonstrate Kubernetes autoscaling using HPA.
+The existing project includes an HPA for the backend.
 
 File:
 
@@ -1840,37 +1195,134 @@ Apply:
 kubectl apply -f k8s/08-backend-hpa.yaml
 ```
 
-Check:
+Verify:
 
 ```bash
 kubectl get hpa -n smallsteps
 ```
 
-Check Metrics Server:
+---
+
+# 17. Prepare the K3s VM
+
+Check K3s:
 
 ```bash
-kubectl get pods -n kube-system | grep metrics
+k3s --version
 ```
 
-Test metrics:
+Check the Kubernetes node:
 
 ```bash
-kubectl top pods -n smallsteps
+kubectl get nodes -o wide
 ```
 
-If `kubectl top` works, the HPA can obtain CPU metrics.
+Check the K3s storage:
+
+```bash
+kubectl get storageclass
+```
+
+Expected:
+
+```text
+local-path (default)
+```
+
+The MongoDB PVC uses this StorageClass.
 
 ---
 
-# 31. Build Docker Images
+# 18. Disable Traefik
 
-Go to the application directory:
+K3s normally installs Traefik as its default Ingress Controller.
+
+This lab uses **NGINX Ingress Controller** instead.
+
+Create the configuration directory if needed:
+
+```bash
+sudo mkdir -p /etc/rancher/k3s
+```
+
+Open:
+
+```bash
+sudo nano /etc/rancher/k3s/config.yaml
+```
+
+Add:
+
+```yaml
+disable:
+  - traefik
+```
+
+Restart K3s:
+
+```bash
+sudo systemctl restart k3s
+```
+
+Verify:
+
+```bash
+kubectl get pods -n kube-system
+```
+
+---
+
+# 19. Install NGINX Ingress Controller
+
+Add the Helm repository:
+
+```bash
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+```
+
+Update:
+
+```bash
+helm repo update
+```
+
+Install:
+
+```bash
+helm install ingress-nginx ingress-nginx/ingress-nginx \
+  --namespace ingress-nginx \
+  --create-namespace
+```
+
+Check:
+
+```bash
+kubectl get pods -n ingress-nginx
+```
+
+Check the Ingress Class:
+
+```bash
+kubectl get ingressclass
+```
+
+Expected:
+
+```text
+nginx
+```
+
+---
+
+# 20. Build the Docker Images
+
+Go to the project directory:
 
 ```bash
 cd mental-health-booking-app
 ```
 
-Build backend:
+Build the backend:
 
 ```bash
 docker build \
@@ -1880,7 +1332,7 @@ docker build \
   .
 ```
 
-Build frontend:
+Build the frontend:
 
 ```bash
 docker build \
@@ -1890,7 +1342,7 @@ docker build \
   .
 ```
 
-Check:
+Verify:
 
 ```bash
 docker images | grep smallsteps
@@ -1902,58 +1354,24 @@ Expected:
 smallsteps-backend
 smallsteps-frontend
 ```
-<img width="885" height="131" alt="image" src="https://github.com/user-attachments/assets/ada88a43-a63e-4c7e-b9ed-ac82672dc32b" />
 
 ---
 
-# 32. Test Docker First
+# 21. Import Images into K3s
 
-Before Kubernetes, make sure the application itself works.
+K3s uses `containerd`, so the Docker images must be imported.
 
-Run:
-
-```bash
-docker compose up -d
-```
-
-Check:
+Export the backend:
 
 ```bash
-docker compose ps
-```
-
-Test the API:
-
-```bash
-curl http://localhost/api/health
-```
-<img width="910" height="260" alt="image" src="https://github.com/user-attachments/assets/85beb8c4-e729-41a8-93ad-a228dbc97621" />
-
-When finished:
-
-```bash
-docker compose down
-```
-
----
-
-# 33. Import Images into K3s
-
-K3s uses containerd.
-
-Export backend:
-
-```bash
-docker save \
-  smallsteps-backend:1.0 \
+docker save smallsteps-backend:1.0 \
   -o /tmp/smallsteps-backend.tar
 ```
 
-Export frontend:
+Export the frontend:
 
 ```bash
-docker save \
-  smallsteps-frontend:1.0 \
+docker save smallsteps-frontend:1.0 \
   -o /tmp/smallsteps-frontend.tar
 ```
 
@@ -1977,109 +1395,53 @@ Verify:
 sudo k3s ctr -n k8s.io images list | grep smallsteps
 ```
 
-You should see:
-
-```text
-smallsteps-backend:1.0
-smallsteps-frontend:1.0
-```
-<img width="1130" height="188" alt="image" src="https://github.com/user-attachments/assets/d5f9a002-45e0-4250-9467-f8852b55b6cc" />
-
 ---
 
-# 34. Deployment Order
+# 22. Deploy the Application
 
-Deploy the application in this order:
-
-```text
-1. Namespace
-       |
-       v
-2. ConfigMap + Secret
-       |
-       v
-3. MongoDB StatefulSet + PVC
-       |
-       v
-4. Backend Deployment + Service
-       |
-       v
-5. Frontend Deployment + Service
-       |
-       v
-6. NGINX Ingress
-       |
-       v
-7. Smoke Test Job
-       |
-       v
-8. MongoDB CronJob
-       |
-       v
-9. HPA
-```
-
----
-
-# 35. Step 1 — Namespace
+Apply the manifests in this order:
 
 ```bash
 kubectl apply -f k8s/00-namespace.yaml
-```
 
-Verify:
-
-```bash
-kubectl get ns smallsteps
-```
-<img width="604" height="73" alt="image" src="https://github.com/user-attachments/assets/85dfbc2a-59f6-4062-a6e8-57a96ff9af3f" />
-
----
-
-# 36. Step 2 — ConfigMap and Secret
-
-```bash
 kubectl apply -f k8s/01-configmap-secret.yaml
-```
 
-Verify:
+kubectl apply -f k8s/02-mongodb-statefulset.yaml
 
-```bash
-kubectl get configmap -n smallsteps
-```
-<img width="692" height="73" alt="image" src="https://github.com/user-attachments/assets/fd07d065-17fe-47f9-bd03-1c33c335ca01" />
+kubectl apply -f k8s/03-backend-deployment.yaml
 
-```bash
-kubectl get secret -n smallsteps
+kubectl apply -f k8s/04-frontend-deployment.yaml
+
+kubectl apply -f k8s/05-ingress.yaml
+
+kubectl apply -f k8s/06-smoke-test-job.yaml
+
+kubectl apply -f k8s/07-mongodb-backup-cronjob.yaml
+
+kubectl apply -f k8s/08-backend-hpa.yaml
 ```
-<img width="663" height="77" alt="image" src="https://github.com/user-attachments/assets/3de79693-f7ba-47f5-bf3d-26fa2e6714a2" />
 
 ---
 
-# 37. Step 3 — MongoDB
+# 23. Verify the Deployment
+
+Check Pods:
 
 ```bash
-kubectl apply -f k8s/02-mongodb-statefulset.yaml
+kubectl get pods -n smallsteps
 ```
 
-Watch:
+Check Services:
 
 ```bash
-kubectl get pods -n smallsteps -w
+kubectl get svc -n smallsteps
 ```
 
-Wait until:
+Check StatefulSet:
 
-```text
-mongodb-0   1/1   Running
+```bash
+kubectl get statefulset -n smallsteps
 ```
-
-Press:
-
-```text
-CTRL+C
-```
-<img width="680" height="78" alt="image" src="https://github.com/user-attachments/assets/41f394d7-7052-4fea-adb4-8a96e6ecc38b" />
 
 Check PVC:
 
@@ -2087,109 +1449,39 @@ Check PVC:
 kubectl get pvc -n smallsteps
 ```
 
-Expected:
-
-```text
-mongodb-data-mongodb-0   Bound   2Gi
-```
-<img width="1122" height="113" alt="image" src="https://github.com/user-attachments/assets/b844bb8d-f7c8-4ae7-8011-f4a60fd2b255" />
-
-Check PV:
-
-```bash
-kubectl get pv
-```
-<img width="1121" height="111" alt="image" src="https://github.com/user-attachments/assets/f10907b0-d392-492b-b3d9-9474a4d5be20" />
-
----
-
-# 38. Step 4 — Backend
-
-```bash
-kubectl apply -f k8s/03-backend-deployment.yaml
-```
-
-Check:
-
-```bash
-kubectl get pods -n smallsteps -l app=backend
-```
-<img width="819" height="94" alt="image" src="https://github.com/user-attachments/assets/26b3727b-31d5-4543-92f5-738204b4acdb" />
-
-Wait:
-
-```bash
-kubectl rollout status deployment/backend -n smallsteps
-```
-
-Expected:
-
-```text
-2/2 pods Running
-```
-
-Check Service:
-
-```bash
-kubectl get svc backend-service -n smallsteps
-```
-<img width="782" height="75" alt="image" src="https://github.com/user-attachments/assets/b4ffca5a-88d2-486b-9063-2d177fae22c8" />
-
----
-
-# 39. Step 5 — Frontend
-
-```bash
-kubectl apply -f k8s/04-frontend-deployment.yaml
-```
-
-Check:
-
-```bash
-kubectl get pods -n smallsteps -l app=frontend
-```
-<img width="802" height="76" alt="image" src="https://github.com/user-attachments/assets/444fd9b3-0cdc-4b6f-9e74-c5f1977b155e" />
-
-Wait:
-
-```bash
-kubectl rollout status deployment/frontend -n smallsteps
-```
-
-Check Service:
-
-```bash
-kubectl get svc frontend-service -n smallsteps
-```
-<img width="789" height="75" alt="image" src="https://github.com/user-attachments/assets/d56c2dc7-deb3-4d2e-b203-3c56054583a3" />
-
----
-
-# 40. Step 6 — Ingress
-
-Apply:
-
-```bash
-kubectl apply -f k8s/05-ingress.yaml
-```
-
-Check:
+Check Ingress:
 
 ```bash
 kubectl get ingress -n smallsteps
 ```
-<img width="734" height="76" alt="image" src="https://github.com/user-attachments/assets/808b503a-e677-40a2-9be4-76339a4a9644" />
 
-Describe:
+Check Job:
 
 ```bash
-kubectl describe ingress smallsteps-ingress -n smallsteps
+kubectl get jobs -n smallsteps
 ```
-<img width="904" height="398" alt="image" src="https://github.com/user-attachments/assets/e02a2fe4-54c2-4240-b06d-747aef3bafb6" />
+
+Check CronJob:
+
+```bash
+kubectl get cronjobs -n smallsteps
+```
+
+Check HPA:
+
+```bash
+kubectl get hpa -n smallsteps
+```
+
+Or check everything together:
+
+```bash
+kubectl get all -n smallsteps
+```
 
 ---
 
-# 41. Configure VM DNS
+# 24. Configure Local DNS
 
 Find the VM IP:
 
@@ -2203,197 +1495,151 @@ Example:
 192.168.107.200
 ```
 
-Use your actual VM IP.
-
----
-
-# 42. Windows Hosts File
-
-If the browser is running on Windows:
-
-Open:
+On the Windows host machine, open:
 
 ```text
 C:\Windows\System32\drivers\etc\hosts
 ```
 
-Run Notepad as Administrator.
-
-Add:
+Run Notepad as Administrator and add:
 
 ```text
 192.168.107.200 smallsteps.local
 ```
 
-Replace the example IP with the actual VM IP.
+Replace the IP with the actual VM IP.
 
-Save the file.
-
----
-
-# 43. Test DNS
-
-From Windows CMD:
+Test:
 
 ```cmd
 ping smallsteps.local
 ```
-<img width="808" height="397" alt="image" src="https://github.com/user-attachments/assets/3c6f600e-741e-4e18-9e2a-c777535b96b8" />
-
-You should see something similar to:
-
-```text
-Pinging smallsteps.local [192.168.107.200]
-```
-
-The important part is that the hostname resolves to the VM IP.
 
 ---
 
-# 44. Step 7 — Application Testing
-
-## Check all resources
-
-```bash
-kubectl get all -n smallsteps
-```
-<img width="902" height="451" alt="image" src="https://github.com/user-attachments/assets/63ab01db-dd76-48ab-be9f-136d5a2702ac" />
-
-Check PVC:
-
-```bash
-kubectl get pvc -n smallsteps
-```
-<img width="1121" height="96" alt="image" src="https://github.com/user-attachments/assets/fdd1b751-6b74-49c3-ac91-728d5372b27d" />
-
-Check Ingress:
-
-```bash
-kubectl get ingress -n smallsteps
-```
-<img width="683" height="77" alt="image" src="https://github.com/user-attachments/assets/c5fa97c2-4dd3-46b3-84d3-a409144831b4" />
-
-Check Jobs:
-
-```bash
-kubectl get jobs -n smallsteps
-```
-<img width="693" height="61" alt="image" src="https://github.com/user-attachments/assets/ec82347f-8f7c-4d1e-a680-bb210d40f169" />
-
-Check CronJobs:
-
-```bash
-kubectl get cronjobs -n smallsteps
-```
-<img width="764" height="60" alt="image" src="https://github.com/user-attachments/assets/aaf9face-4abe-4d89-877d-cce51f46d56e" />
-
-Check HPA:
-
-```bash
-kubectl get hpa -n smallsteps
-```
-<img width="844" height="77" alt="image" src="https://github.com/user-attachments/assets/925eab8b-d7de-4217-b952-8bca9e1aa166" />
-
----
-
-# 45. Test Backend Directly
-
-Use port-forward:
-
-```bash
-kubectl port-forward \
-  svc/backend-service \
-  3000:3000 \
-  -n smallsteps
-```
-<img width="657" height="147" alt="image" src="https://github.com/user-attachments/assets/f228f471-52f8-4e52-9ac4-256e25ed69bb" />
-
-From another terminal:
-
-```bash
-curl http://127.0.0.1:3000/api/health
-```
-<img width="1125" height="136" alt="image" src="https://github.com/user-attachments/assets/421896d7-ee58-4ede-8b0f-6dfb63e82fbb" />
-
-Expected:
-
-```text
-HTTP 200
-```
-
-Stop port-forward:
-
-```text
-CTRL+C
-```
-
----
-
-# 46. Test Frontend Directly
-
-Run:
-
-```bash
-kubectl port-forward \
-  svc/frontend-service \
-  8080:80 \
-  -n smallsteps
-```
-
-Open:
-
-```text
-http://localhost:8080
-```
-<img width="827" height="350" alt="image" src="https://github.com/user-attachments/assets/a7f2932b-3bb5-4992-bbe3-d2378ca339c1" />
-
-<img width="1852" height="817" alt="image" src="https://github.com/user-attachments/assets/5376aa96-a0bc-4e28-8543-a16f9449fcca" />
-
-Stop:
-
-```text
-CTRL+C
-```
----
-
-# 50. Test from Browser
+# 25. Test the Application
 
 Open:
 
 ```text
 http://smallsteps.local
 ```
-<img width="1920" height="1019" alt="image" src="https://github.com/user-attachments/assets/10fbf794-d9b1-4daf-9baf-6a355915cd32" />
+
+Test the API:
+
+```text
+http://smallsteps.local/api/health
+```
 
 The request flow is:
 
 ```text
 Windows Browser
-       |
-       v
+      |
+      v
 smallsteps.local
-       |
-       v
+      |
+      v
 K3s VM
-       |
-       v
-NGINX Ingress Controller
-       |
-       +--------------------+
-       |                    |
-       v                    v
-   frontend-service     backend-service
-       |                    |
-       v                    v
-    NGINX Pods          Node.js Pods
-                            |
-                            v
-                         MongoDB
+      |
+      v
+NGINX Ingress
+      |
+      +----------------------+
+      |                      |
+      v                      v
+frontend-service        backend-service
+      |                      |
+      v                      v
+ NGINX Pods             Node.js Pods
+                              |
+                              v
+                           MongoDB
 ```
 
 ---
 
-# 51. Check Logs
+# 26. Verify the Smoke Test
+
+Check:
+
+```bash
+kubectl get jobs -n smallsteps
+```
+
+View the logs:
+
+```bash
+kubectl logs job/smallsteps-smoke-test -n smallsteps
+```
+
+Expected:
+
+```text
+Testing backend...
+Backend test passed.
+
+Testing frontend...
+Frontend test passed.
+
+All smoke tests passed.
+```
+
+---
+
+# 27. Test StatefulSet Persistence
+
+Check MongoDB:
+
+```bash
+kubectl get pod mongodb-0 -n smallsteps
+```
+
+Delete the MongoDB Pod:
+
+```bash
+kubectl delete pod mongodb-0 -n smallsteps
+```
+
+Watch:
+
+```bash
+kubectl get pods -n smallsteps -w
+```
+
+Kubernetes recreates:
+
+```text
+mongodb-0
+```
+
+Check the PVC:
+
+```bash
+kubectl get pvc -n smallsteps
+```
+
+The PVC should remain:
+
+```text
+Bound
+```
+
+This demonstrates the main difference between:
+
+```text
+Deployment
+```
+
+and:
+
+```text
+StatefulSet
+```
+
+---
+
+# 28. Useful Logs
 
 Backend:
 
@@ -2423,529 +1669,66 @@ kubectl logs \
 
 ---
 
-# 52. Check Pod Details
+# 29. Basic Troubleshooting
 
-List Pods:
-
-```bash
-kubectl get pods -n smallsteps -o wide
-```
-
-Describe backend Pod:
+### Check Pods
 
 ```bash
-kubectl describe pod \
-  $(kubectl get pod -n smallsteps -l app=backend -o jsonpath='{.items[0].metadata.name}') \
-  -n smallsteps
+kubectl get pods -n smallsteps
 ```
 
-Describe MongoDB:
-
-```bash
-kubectl describe pod mongodb-0 -n smallsteps
-```
-
----
-
-# 53. Test StatefulSet Persistence
-
-Check MongoDB:
-
-```bash
-kubectl get pod mongodb-0 -n smallsteps
-```
-
-Delete the Pod:
-
-```bash
-kubectl delete pod mongodb-0 -n smallsteps
-```
-
-Watch:
-
-```bash
-kubectl get pods -n smallsteps -w
-```
-
-Kubernetes will recreate:
-
-```text
-mongodb-0
-```
-
-Check PVC:
-
-```bash
-kubectl get pvc -n smallsteps
-```
-
-The PVC should remain:
-
-```text
-Bound
-```
-
-This demonstrates the difference between:
-
-```text
-Deployment
-```
-
-and:
-
-```text
-StatefulSet
-```
-
----
-
-# 54. Test Backend Rolling Update
-
-Build another image:
-
-```bash
-docker build \
-  -f docker/Dockerfile \
-  --target backend \
-  -t smallsteps-backend:1.1 \
-  .
-```
-
-Export:
-
-```bash
-docker save \
-  smallsteps-backend:1.1 \
-  -o /tmp/smallsteps-backend-1.1.tar
-```
-
-Import into K3s:
-
-```bash
-sudo k3s ctr -n k8s.io images import \
-  /tmp/smallsteps-backend-1.1.tar
-```
-
-Change:
-
-```yaml
-image: smallsteps-backend:1.0
-```
-
-to:
-
-```yaml
-image: smallsteps-backend:1.1
-```
-
-Then:
-
-```bash
-kubectl apply -f k8s/03-backend-deployment.yaml
-```
-
-Watch:
-
-```bash
-kubectl get pods -n smallsteps -l app=backend -w
-```
-
-Check:
-
-```bash
-kubectl rollout status deployment/backend -n smallsteps
-```
-
----
-
-# 55. Roll Back a Deployment
-
-View history:
-
-```bash
-kubectl rollout history deployment/backend -n smallsteps
-```
-
-Rollback:
-
-```bash
-kubectl rollout undo deployment/backend -n smallsteps
-```
-
-Check:
-
-```bash
-kubectl rollout status deployment/backend -n smallsteps
-```
-
----
-
-# 56. Verify HPA
-
-Run:
-
-```bash
-kubectl get hpa -n smallsteps
-```
-
-Detailed:
-
-```bash
-kubectl describe hpa backend-hpa -n smallsteps
-```
-
-Check metrics:
-
-```bash
-kubectl top pods -n smallsteps
-```
-
-The backend starts with:
-
-```text
-2 replicas
-```
-
-and can scale up to:
-
-```text
-5 replicas
-```
-
-according to CPU utilization.
-
----
-
-# 57. Debugging Cheat Sheet
-
-| Task | Command |
-|---|---|
-| Nodes | `kubectl get nodes -o wide` |
-| All resources | `kubectl get all -n smallsteps` |
-| Pods | `kubectl get pods -n smallsteps` |
-| Pods + IP | `kubectl get pods -n smallsteps -o wide` |
-| Services | `kubectl get svc -n smallsteps` |
-| Endpoints | `kubectl get endpoints -n smallsteps` |
-| Deployments | `kubectl get deployments -n smallsteps` |
-| StatefulSets | `kubectl get sts -n smallsteps` |
-| PVCs | `kubectl get pvc -n smallsteps` |
-| PVs | `kubectl get pv` |
-| StorageClasses | `kubectl get storageclass` |
-| Ingress | `kubectl get ingress -n smallsteps` |
-| Ingress details | `kubectl describe ingress -n smallsteps` |
-| Jobs | `kubectl get jobs -n smallsteps` |
-| CronJobs | `kubectl get cronjobs -n smallsteps` |
-| HPA | `kubectl get hpa -n smallsteps` |
-| Backend logs | `kubectl logs deployment/backend -n smallsteps` |
-| Frontend logs | `kubectl logs deployment/frontend -n smallsteps` |
-| MongoDB logs | `kubectl logs mongodb-0 -n smallsteps` |
-| Ingress logs | `kubectl logs -n ingress-nginx deployment/ingress-nginx-controller` |
-| Pod details | `kubectl describe pod POD_NAME -n smallsteps` |
-| Events | `kubectl get events -n smallsteps --sort-by=.lastTimestamp` |
-| CPU/Memory | `kubectl top pods -n smallsteps` |
-
----
-
-# 58. Common Problems
-
-## Problem: `ImagePullBackOff`
-
-Check:
+### Check Pod details
 
 ```bash
 kubectl describe pod POD_NAME -n smallsteps
 ```
 
-Verify image:
+### Check events
+
+```bash
+kubectl get events \
+  -n smallsteps \
+  --sort-by=.lastTimestamp
+```
+
+### Check images
 
 ```bash
 sudo k3s ctr -n k8s.io images list | grep smallsteps
 ```
 
-If missing, import again:
+### Check Ingress
 
 ```bash
-sudo k3s ctr -n k8s.io images import /tmp/smallsteps-backend.tar
+kubectl get ingress -n smallsteps
 ```
 
-or:
+### Check Ingress Controller
 
 ```bash
-sudo k3s ctr -n k8s.io images import /tmp/smallsteps-frontend.tar
+kubectl get pods -n ingress-nginx
 ```
 
----
-
-# 59. Backend CrashLoopBackOff
-
-Check:
+### Check application logs
 
 ```bash
 kubectl logs deployment/backend -n smallsteps
 ```
 
-Then:
-
-```bash
-kubectl describe pod POD_NAME -n smallsteps
-```
-
-Check the Secret:
-
-```bash
-kubectl get secret smallsteps-secret -n smallsteps
-```
-
-Typical causes:
-
-```text
-Wrong MongoDB URI
-Wrong JWT_SECRET
-MongoDB unavailable
-Node.js application error
-Missing dependency
-Application listening only on localhost
-```
-
 ---
 
-# 60. MongoDB Not Ready
+# 30. Cleanup
 
-Check:
-
-```bash
-kubectl get pvc -n smallsteps
-```
-
-The PVC must be:
-
-```text
-Bound
-```
-
-Check logs:
-
-```bash
-kubectl logs mongodb-0 -n smallsteps
-```
-
-Check:
-
-```bash
-kubectl describe pod mongodb-0 -n smallsteps
-```
-
----
-
-# 61. Ingress Not Working
-
-Check controller:
-
-```bash
-kubectl get pods -n ingress-nginx
-```
-
-Check Service:
-
-```bash
-kubectl get svc -n ingress-nginx
-```
-
-Check Ingress:
-
-```bash
-kubectl get ingress -n smallsteps
-```
-
-Check class:
-
-```bash
-kubectl get ingressclass
-```
-
-Check configuration:
-
-```bash
-kubectl describe ingress smallsteps-ingress -n smallsteps
-```
-
-Check controller logs:
-
-```bash
-kubectl logs \
-  -n ingress-nginx \
-  deployment/ingress-nginx-controller
-```
-
----
-
-# 62. `smallsteps.local` Does Not Open
-
-Check Windows hosts:
-
-```text
-C:\Windows\System32\drivers\etc\hosts
-```
-
-Make sure:
-
-```text
-YOUR_VM_IP smallsteps.local
-```
-
-exists.
-
-Test:
-
-```cmd
-ping smallsteps.local
-```
-
-Then test the VM directly:
-
-```bash
-curl \
-  -H "Host: smallsteps.local" \
-  http://YOUR_VM_IP/api/health
-```
-
-If the `curl` command works but the browser does not, the problem is likely on the Windows DNS/hosts side.
-
----
-
-# 63. Check K3s Service
-
-```bash
-sudo systemctl status k3s --no-pager
-```
-
-Check logs:
-
-```bash
-sudo journalctl -u k3s -n 100 --no-pager
-```
-
----
-
-# 64. Complete Verification
-
-Run:
-
-```bash
-kubectl get nodes
-```
-
-```bash
-kubectl get pods -n ingress-nginx
-```
-
-```bash
-kubectl get all -n smallsteps
-```
-
-```bash
-kubectl get pvc -n smallsteps
-```
-
-```bash
-kubectl get ingress -n smallsteps
-```
-
-```bash
-kubectl get jobs -n smallsteps
-```
-
-```bash
-kubectl get cronjobs -n smallsteps
-```
-
-```bash
-kubectl get hpa -n smallsteps
-```
-
-Then:
-
-```bash
-curl \
-  -H "Host: smallsteps.local" \
-  http://YOUR_VM_IP/api/health
-```
-
-Finally:
-
-```text
-http://smallsteps.local
-```
-
----
-
-# 65. Teardown
-
-Delete the application resources:
-
-```bash
-kubectl delete -f k8s/08-backend-hpa.yaml
-```
-
-```bash
-kubectl delete -f k8s/07-mongodb-backup-cronjob.yaml
-```
-
-```bash
-kubectl delete -f k8s/06-smoke-test-job.yaml
-```
-
-```bash
-kubectl delete -f k8s/05-ingress.yaml
-```
-
-```bash
-kubectl delete -f k8s/04-frontend-deployment.yaml
-```
-
-```bash
-kubectl delete -f k8s/03-backend-deployment.yaml
-```
-
-```bash
-kubectl delete -f k8s/02-mongodb-statefulset.yaml
-```
-
-```bash
-kubectl delete -f k8s/01-configmap-secret.yaml
-```
-
-```bash
-kubectl delete -f k8s/00-namespace.yaml
-```
-
-Or simply delete the entire namespace:
+Delete the complete application namespace:
 
 ```bash
 kubectl delete namespace smallsteps
 ```
 
-Check:
+Remove NGINX Ingress if required:
 
 ```bash
-kubectl get namespace smallsteps
-```
-
-Expected:
-
-```text
-Error from server (NotFound)
-```
-
----
-
-# 66. Remove NGINX Ingress Controller
-
-If you want to remove NGINX:
-
-```bash
-helm uninstall ingress-nginx \
-  -n ingress-nginx
+helm uninstall ingress-nginx -n ingress-nginx
 ```
 
 Then:
@@ -2956,15 +1739,11 @@ kubectl delete namespace ingress-nginx
 
 ---
 
-# 67. Restore Traefik
+# 31. Restore Traefik
 
-This is optional.
+This step is optional.
 
-For this lab, keep NGINX Ingress.
-
-If you want to restore the K3s default Traefik:
-
-Edit:
+If you want to restore the K3s default Traefik, edit:
 
 ```bash
 sudo nano /etc/rancher/k3s/config.yaml
@@ -2977,7 +1756,7 @@ disable:
   - traefik
 ```
 
-Then:
+Restart K3s:
 
 ```bash
 sudo systemctl restart k3s
@@ -2991,129 +1770,104 @@ kubectl get pods -n kube-system | grep traefik
 
 ---
 
-# 68. Final Architecture
-
-The completed project looks like this:
+# 32. Final Architecture
 
 ```text
-                           INTERNET / LAN
-                                |
-                                |
-                         smallsteps.local
-                                |
-                                v
-                 +---------------------------+
-                 | NGINX INGRESS CONTROLLER  |
-                 |                           |
-                 | HTTP :80                  |
-                 | HTTPS :443                |
-                 +-------------+-------------+
-                               |
-                +--------------+--------------+
-                |                             |
-              /api                            /
-                |                             |
-                v                             v
-       +------------------+          +------------------+
-       | backend-service  |          | frontend-service |
-       | ClusterIP :3000  |          | ClusterIP :80   |
-       +--------+---------+          +--------+---------+
-                |                             |
-                v                             v
-       +------------------+          +------------------+
-       | Backend          |          | NGINX            |
-       | Deployment       |          | Deployment       |
-       |                  |          |                  |
-       | backend-xxxx     |          | frontend-xxxx    |
-       | backend-yyyy     |          | frontend-yyyy    |
-       +--------+---------+          +------------------+
-                |
-                |
-                v
-       +-------------------------+
-       | mongodb-headless        |
-       | Headless Service        |
-       +------------+------------+
-                    |
-                    v
-       +-------------------------+
-       | MongoDB StatefulSet     |
-       |                         |
-       | mongodb-0               |
-       +------------+------------+
-                    |
-                    v
-       +-------------------------+
-       | mongodb-data PVC        |
-       |                         |
-       | 2Gi                     |
-       | local-path               |
-       +-------------------------+
+                         INTERNET / LAN
+                              |
+                       smallsteps.local
+                              |
+                              v
+                +---------------------------+
+                | NGINX INGRESS CONTROLLER  |
+                |                           |
+                | HTTP :80                 |
+                | HTTPS :443               |
+                +-------------+-------------+
+                              |
+                 +------------+------------+
+                 |                         |
+               /api                        /
+                 |                         |
+                 v                         v
+        +------------------+      +------------------+
+        | backend-service  |      | frontend-service |
+        | ClusterIP :3000  |      | ClusterIP :80    |
+        +--------+---------+      +--------+---------+
+                 |                         |
+                 v                         v
+        +------------------+      +------------------+
+        | Backend          |      | NGINX            |
+        | Deployment       |      | Deployment       |
+        | 2 replicas       |      | 2 replicas       |
+        +--------+---------+      +------------------+
+                 |
+                 v
+        +-------------------------+
+        | mongodb-headless        |
+        | Headless Service        |
+        +------------+------------+
+                     |
+                     v
+        +-------------------------+
+        | MongoDB StatefulSet     |
+        | mongodb-0               |
+        +------------+------------+
+                     |
+                     v
+        +-------------------------+
+        | MongoDB PVC             |
+        | 2Gi / local-path        |
+        +-------------------------+
 
+        +-------------------------+
+        | Kubernetes Job          |
+        | Smoke Test              |
+        +-------------------------+
 
-       +-------------------------+
-       | Kubernetes Job          |
-       | Smoke Test              |
-       +-------------------------+
+        +-------------------------+
+        | Kubernetes CronJob      |
+        | MongoDB Backup          |
+        +-------------------------+
 
-       +-------------------------+
-       | Kubernetes CronJob      |
-       | MongoDB Backup          |
-       +-------------------------+
-
-       +-------------------------+
-       | HPA                     |
-       | Backend 2 -> 5 Pods     |
-       +-------------------------+
+        +-------------------------+
+        | HPA                     |
+        | Backend 2 -> 5 Pods     |
+        +-------------------------+
 ```
 
 ---
 
-# 69. Kubernetes Topics Covered
+# 33. Kubernetes Topics Covered
 
-This project intentionally covers the most useful Kubernetes concepts for this application:
-
-| Topic | Used? | Purpose |
-|---|---|---|
-| Namespace | Yes | Application isolation |
-| ConfigMap | Yes | Non-sensitive configuration |
-| Secret | Yes | Credentials |
-| Deployment | Yes | Stateless application |
-| StatefulSet | Yes | MongoDB |
-| PVC | Yes | MongoDB persistence |
-| StorageClass | Yes | K3s `local-path` |
-| Headless Service | Yes | Stateful MongoDB DNS |
-| ClusterIP | Yes | Internal services |
-| Ingress | Yes | External HTTP routing |
-| NGINX Ingress | Yes | External access |
-| Liveness Probe | Yes | Detect unhealthy containers |
-| Readiness Probe | Yes | Control traffic |
-| Startup Probe | Yes | Slow startup handling |
-| Rolling Update | Yes | Zero/minimal downtime deployment |
-| Job | Yes | One-time smoke test |
-| CronJob | Yes | Scheduled backup |
-| HPA | Yes | Backend autoscaling |
-| Kubernetes DNS | Yes | Service discovery |
-| Traefik | Disabled | Replaced by NGINX |
-| DaemonSet | No | Not required |
-| RBAC | No | Not required for this application |
-| NetworkPolicy | No | Not required for this simple lab |
-| Service Mesh | No | Unnecessary complexity |
-| Operators | No | Unnecessary complexity |
+| Topic | Purpose |
+|---|---|
+| Namespace | Application isolation |
+| ConfigMap | Non-sensitive configuration |
+| Secret | Credentials |
+| Deployment | Stateless application |
+| StatefulSet | MongoDB |
+| PVC | Persistent MongoDB storage |
+| StorageClass | K3s `local-path` |
+| Headless Service | Stateful MongoDB DNS |
+| ClusterIP | Internal service communication |
+| Ingress | External HTTP routing |
+| NGINX Ingress | Application entry point |
+| Liveness Probe | Detect unhealthy containers |
+| Readiness Probe | Control traffic |
+| Startup Probe | Handle application startup |
+| Rolling Update | Safe application updates |
+| Job | One-time smoke test |
+| CronJob | Scheduled MongoDB backup |
+| HPA | Backend autoscaling |
+| Kubernetes DNS | Service discovery |
+| Traefik | Disabled and replaced by NGINX |
 
 ---
 
-# 70. Final Learning Flow
-
-The complete DevOps flow is:
+# 34. Final Deployment Flow
 
 ```text
-Developer
-    |
-    v
-Node.js Application
-    |
-    v
 Dockerfile
     |
     v
@@ -3125,186 +1879,88 @@ K3s containerd
     v
 Kubernetes Namespace
     |
-    +-----------------------+
-    |                       |
-    v                       v
-ConfigMap                Secret
-    |                       |
-    +-----------+-----------+
-                |
-                v
-        Kubernetes Workloads
-                |
-        +-------+-------+
-        |       |       |
-        v       v       v
-      Mongo   Backend  Frontend
-      Stateful Deployment Deployment
-        |       |       |
-        |       |       |
-        |       +---+---+
-        |           |
-        v           v
-       PVC       Services
-                    |
-                    v
-              NGINX Ingress
-                    |
-                    v
-             smallsteps.local
-                    |
-                    v
-                 Browser
+    +-------------------+
+    |                   |
+    v                   v
+ ConfigMap            Secret
+    |                   |
+    +---------+---------+
+              |
+              v
+       Kubernetes Workloads
+              |
+       +------+------+------+
+       |      |      |      |
+       v      v      v      v
+     Mongo  Backend Frontend Job
+       |      |      |
+       |      |      |
+       v      v      v
+      PVC   Services NGINX
+              |
+              v
+        NGINX Ingress
+              |
+              v
+       smallsteps.local
+              |
+              v
+           Browser
 ```
 
 ---
 
-# 71. Final Commands — Quick Deployment
+# 35. Result
 
-After all files are created and Docker images are available:
+The final project provides a simple full-stack Kubernetes architecture running on a K3s VM.
 
-```bash
-# 1. Disable Traefik
-sudo nano /etc/rancher/k3s/config.yaml
-
-# Add:
-# disable:
-#   - traefik
-
-sudo systemctl restart k3s
-
-# 2. Install NGINX Ingress
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-helm repo update
-
-helm install ingress-nginx ingress-nginx/ingress-nginx \
-  --namespace ingress-nginx \
-  --create-namespace
-
-# 3. Build images
-docker build \
-  -f docker/Dockerfile \
-  --target backend \
-  -t smallsteps-backend:1.0 \
-  .
-
-docker build \
-  -f docker/Dockerfile \
-  --target frontend \
-  -t smallsteps-frontend:1.0 \
-  .
-
-# 4. Import images into K3s
-docker save smallsteps-backend:1.0 \
-  -o /tmp/smallsteps-backend.tar
-
-docker save smallsteps-frontend:1.0 \
-  -o /tmp/smallsteps-frontend.tar
-
-sudo k3s ctr -n k8s.io images import \
-  /tmp/smallsteps-backend.tar
-
-sudo k3s ctr -n k8s.io images import \
-  /tmp/smallsteps-frontend.tar
-
-# 5. Deploy application
-kubectl apply -f k8s/00-namespace.yaml
-
-kubectl apply -f k8s/01-configmap-secret.yaml
-
-kubectl apply -f k8s/02-mongodb-statefulset.yaml
-
-kubectl apply -f k8s/03-backend-deployment.yaml
-
-kubectl apply -f k8s/04-frontend-deployment.yaml
-
-kubectl apply -f k8s/05-ingress.yaml
-
-kubectl apply -f k8s/06-smoke-test-job.yaml
-
-kubectl apply -f k8s/07-mongodb-backup-cronjob.yaml
-
-kubectl apply -f k8s/08-backend-hpa.yaml
-
-# 6. Verify
-kubectl get pods -n smallsteps
-
-kubectl get svc -n smallsteps
-
-kubectl get pvc -n smallsteps
-
-kubectl get ingress -n smallsteps
-
-kubectl get jobs -n smallsteps
-
-kubectl get cronjobs -n smallsteps
-
-kubectl get hpa -n smallsteps
-```
-
-Then configure the client machine:
-
-```text
-YOUR_VM_IP smallsteps.local
-```
-
-and open:
-
-```text
-http://smallsteps.local
-```
-
----
-
-# 72. Result
-
-The final application is a simple but complete Kubernetes project:
+The application uses:
 
 ```text
 Docker
-  |
-  v
+   |
+   v
 K3s
-  |
-  +-- Namespace
-  |
-  +-- ConfigMap
-  |
-  +-- Secret
-  |
-  +-- MongoDB StatefulSet
-  |      |
-  |      +-- Headless Service
-  |      |
-  |      +-- 2Gi PVC
-  |             |
-  |             +-- local-path
-  |
-  +-- Backend Deployment
-  |      |
-  |      +-- 2 replicas
-  |      +-- Health Probes
-  |      +-- Rolling Updates
-  |      +-- HPA
-  |
-  +-- Frontend Deployment
-  |      |
-  |      +-- NGINX
-  |      +-- 2 replicas
-  |
-  +-- Job
-  |      |
-  |      +-- Smoke Test
-  |
-  +-- CronJob
-  |      |
-  |      +-- MongoDB Backup
-  |
-  +-- NGINX Ingress
-         |
-         +-- /
-         |
-         +-- /api
+   |
+   +-- Namespace
+   |
+   +-- ConfigMap
+   |
+   +-- Secret
+   |
+   +-- MongoDB StatefulSet
+   |      |
+   |      +-- Headless Service
+   |      |
+   |      +-- 2Gi PVC
+   |             |
+   |             +-- local-path
+   |
+   +-- Backend Deployment
+   |      |
+   |      +-- 2 replicas
+   |      +-- Health Probes
+   |      +-- Rolling Update
+   |      +-- HPA
+   |
+   +-- Frontend Deployment
+   |      |
+   |      +-- NGINX
+   |      +-- 2 replicas
+   |
+   +-- Job
+   |      |
+   |      +-- Smoke Test
+   |
+   +-- CronJob
+   |      |
+   |      +-- MongoDB Backup
+   |
+   +-- NGINX Ingress
+          |
+          +-- /
+          |
+          +-- /api
 ```
 
-The design deliberately stays simple while demonstrating the Kubernetes concepts that are most useful for a real full-stack application.
+The architecture stays simple while demonstrating the major Kubernetes concepts required for this lab.
